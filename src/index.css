@@ -1,0 +1,18 @@
+* {
+    box-sizing: border-box; .app {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+    font-family: system-ui, sans-serif;
+  }
+
+  header h1 {
+    margin: 0;
+    color: #2563eb;
+  }
+
+  header p {
+    margin: 0.25rem 0 2rem;
+    color: #666;
+  }
+}
