@@ -1,15 +1,29 @@
-import './App.css'
+import { Routes, Route, Link } from 'react-router-dom'
+  import ListaFacturas from './pages/ListaFacturas'
+  import NuevaFactura from './pages/NuevaFactura'
+  import Configuracion from './pages/Configuracion'
+  import './App.css'
 
   function App() {
     return (
       <div className="app">
         <header>
           <h1>Facturtest</h1>
-          <p>Sistema de facturación</p>
+          <nav>
+            <Link to="/">Facturas</Link>
+            {' | '}
+            <Link to="/nueva-factura">Nueva factura</Link>
+            {' | '}
+            <Link to="/configuracion">Configuración</Link>
+          </nav>
         </header>
 
         <main>
-          <p>¡Empezamos aquí! 🚀</p>
+          <Routes>
+            <Route path="/" element={<ListaFacturas />} />
+            <Route path="/nueva-factura" element={<NuevaFactura />}/>
+            <Route path="/configuracion" element={<Configuracion/>} />
+          </Routes>
         </main>
       </div>
     )
