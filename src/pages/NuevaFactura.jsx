@@ -1,9 +1,10 @@
 import { useForm, useFieldArray } from 'react-hook-form'
+import { calcularBaseImponible, calcularTotal } from '../utils/calculos'
 
 function NuevaFactura() {
-  const { register, control, handleSubmit } = useForm({
+  const { register, control, handleSubmit, watch } = useForm({
     //defaultvalues: se define la forma inicial del formulario:
-    defaultValues: {  
+    defaultValues: {
       cliente: { nombre: '', nif: '', direccion: '' },
       conceptos: [{ descripcion: '', cantidad: 1, precioUnitario: 0 }],
       iva: 21,
@@ -22,6 +23,14 @@ function NuevaFactura() {
     control,
     name: 'conceptos',
   })
+
+  //watch observa los valores del formulario en tiempo real:
+  const conceptos = watch('conceptos')
+  const iva = watch('iva')
+
+  //se recalcula en cada render con las funciones de utils/calculos:
+  const baseImponible = calcularBaseImponible(conceptos)
+  const total = calcularTotal(baseImponible, iva)
 
   const onSubmit = (datos) => {
     console.log('Factura:', datos) //de momento, solo lo mostramos
@@ -89,7 +98,6 @@ function NuevaFactura() {
               </button>
             </div>
           ))}
-
           <button
             type="button"
             onClick={() => append({ descripcion: '', cantidad: 1, precioUnitario: 0 })}
@@ -98,6 +106,14 @@ function NuevaFactura() {
             + Añadir concepto
           </button>
         </fieldset>
+
+        {/* Resumen de totales */}
+          <div className="border rounded p-4 flex flex-col gap-1 items-end">
+            <span>Base imponible: {baseImponible.toFixed(2)} €</span>
+            <span>IVA ({iva}%): {(total - baseImponible).toFixed(2)} €</span>
+            <span className="font-bold text-lg">Total: {total.toFixed(2)} €</span>
+          </div>
+
         <button
           type="submit"
           className="bg-blue-600 text-white rounded px-4 py-2 font-medium self-start"
