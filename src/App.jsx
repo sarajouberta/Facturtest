@@ -3,6 +3,7 @@ import ListaFacturas from './pages/ListaFacturas'
 import NuevaFactura from './pages/NuevaFactura'
 import Configuracion from './pages/Configuracion'
 import './App.css'
+import DetalleFactura from './pages/DetalleFactura'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
         <Routes>
           <Route path="/" element={<ListaFacturas />} />
           <Route path="/nueva-factura" element={<NuevaFactura />}/>
+          <Route path="/factura/:id" element={<DetalleFactura />} />
           <Route path="/configuracion" element={<Configuracion/>} />
         </Routes>
       </main>
