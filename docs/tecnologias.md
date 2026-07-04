@@ -48,9 +48,15 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 ```js
 {
   id, numero, fecha,
-  cliente: { nombre, nif, direccion },
-  conceptos: [ { descripcion, cantidad, precioUnitario } ],
-  iva, baseImponible, total
+  cliente:  { nombre, nif, direccion, localidad, provincia, telefono },
+  vehiculo: { modelo, vehiculo, matricula, km },
+  trabajos,                                          // texto libre
+  conceptos: [ { descripcion, cantidad, precioUnitario } ],  // "materiales"
+  manoDeObra,                                        // importe en €
+  iva,
+  totalMateriales,   // suma de los materiales
+  baseImponible,     // = totalMateriales + manoDeObra
+  total              // = baseImponible + IVA
 }
 ```
 
@@ -60,8 +66,45 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 ```
 
 Decisiones de diseño:
-- Se guardan `baseImponible` y `total` en la factura (documento legal "congelado").
+- Se guardan `totalMateriales`, `baseImponible` y `total` en la factura (documento legal "congelado").
 - Número de factura automático correlativo (`F-2026-001`) con opción a editar.
+- Cálculo: `base = materiales + mano de obra`; el IVA se aplica sobre la base.
+- Modelo ampliado tras analizar la factura de papel real del taller (vehículo, mano de
+  obra separada, cliente completo, trabajos realizados).
+
+## Anatomía de un archivo `.jsx` — las 3 capas
+
+Un componente React (`.jsx`) NO es solo JavaScript: mezcla **tres capas** en el mismo
+sitio. En web clásica iban en archivos separados (HTML + CSS + JS); React las junta
+porque una pieza de interfaz necesita las tres a la vez.
+
+1. **JavaScript** (la lógica): variables, funciones, `.map()`, condiciones, operadores.
+   ```js
+   const totalMateriales = factura.totalMateriales ?? 0
+   ```
+2. **JSX** (la estructura): etiquetas tipo HTML (`<div>`, `<span>`, `<table>`). No es
+   HTML de verdad, es sintaxis de React. Todo lo que va entre **llaves `{ }}`** dentro
+   del JSX es una "ventana" para volver a JavaScript:
+   ```jsx
+   <h2>Factura {factura.numero}</h2>
+   {factura.conceptos?.map((c, i) => ( ... ))}
+   {factura.trabajos && ( ... )}   // renderizado condicional
+   ```
+3. **Tailwind / CSS** (el aspecto): lo que va dentro de `className="..."`.
+   ```jsx
+   className="border rounded p-4 text-sm text-gray-600"
+   ```
+
+Cómo distinguirlas de un vistazo:
+
+| Ves esto... | Es... |
+|---|---|
+| `const`, `function`, `.map()`, `??`, `=>` | JavaScript |
+| `<div>`, `<span>`, `<table>` (etiquetas) | JSX (estructura) |
+| `{ algo }` dentro de las etiquetas | JavaScript metido en el JSX |
+| contenido de `className="..."` | Tailwind / CSS (aspecto) |
+
+El nombre `.jsx` (en vez de `.js`) es la pista de que dentro hay JSX además de JavaScript.
 
 ## Pendiente en el plan
 
