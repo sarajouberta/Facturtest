@@ -1,12 +1,18 @@
 import { useParams, useNavigate } from 'react-router-dom'
   import { useLiveQuery } from 'dexie-react-hooks'
   import { db } from '../db'
+  import FacturaPDF from '../components/FacturaPDF'
+
+
 
   function DetalleFactura() {
     const { id } = useParams()
     const navigate = useNavigate()
 
     const factura = useLiveQuery(() => db.facturas.get(Number(id)), [id])
+
+    //para mostrar temporalmente el detalle:
+    const config = useLiveQuery(() => db.config.get(1))
 
     if (!factura) return <p>Cargando…</p>
 
@@ -107,6 +113,11 @@ import { useParams, useNavigate } from 'react-router-dom'
   px-4 py-2">
             Eliminar
           </button>
+        </div>
+
+        {/* Vista previa de la factura imprimible (temporal) */}
+        <div style={{ marginTop: '32px' }}>
+          <FacturaPDF factura={factura} config={config} />
         </div>
       </div>
     )
