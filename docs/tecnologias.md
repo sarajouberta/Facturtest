@@ -143,6 +143,18 @@ El nombre `.jsx` (en vez de `.js`) es la pista de que dentro hay JSX además de 
 
 **MVP completo.**
 
+## Despliegue
+
+Desplegada en **Vercel** (plan gratuito), conectada al repo de GitHub: cada `git push`
+a `main` la redespliega automáticamente. URL: https://facturtest.vercel.app
+
+| Archivo | Para qué |
+|---|---|
+| `vercel.json` | Redirige TODAS las rutas a `index.html` (`rewrites`) para que el enrutado de React Router funcione en producción (si no, recargar en `/nueva-factura` o `/configuracion` daría 404). |
+
+Nota: JSON no admite comentarios (`//` o `/* */` rompen el archivo); por eso las
+explicaciones de configuración van aquí, en la documentación, y no dentro del `.json`.
+
 ## Mejoras futuras / pendiente
 
 - **Desplegar** en Vercel o Netlify (build → `dist/`) para tener una URL `https://` real
