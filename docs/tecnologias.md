@@ -26,12 +26,33 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 | **dexie-react-hooks** (`useLiveQuery`) | Las pantallas se actualizan solas al cambiar los datos. | Lista de facturas |
 | **React Hook Form** | Gestión de formularios. Piezas: `useForm`, `register`, `handleSubmit`, `watch`, `setValue`, y `useFieldArray` para líneas dinámicas. | `NuevaFactura.jsx`, `Configuracion.jsx` |
 
+## Generación de PDF
+
+| Tecnología | Para qué | Dónde se usa |
+|---|---|---|
+| **html2canvas-pro** | "Fotografía" un trozo de HTML (la hoja de factura) y lo convierte en imagen. Es un fork moderno de html2canvas que soporta el CSS actual (colores `oklch` de Tailwind v4). | `DetalleFactura.jsx` (`exportarPDF`) |
+| **jsPDF** | Crea el archivo PDF y coloca dentro la imagen capturada (A4 vertical, centrada). | `DetalleFactura.jsx` |
+| **Web Share API** (`navigator.share`) | API nativa del navegador móvil: abre el menú de compartir del sistema (WhatsApp, email, imprimir). Si el dispositivo no la soporta (PC), se descarga el PDF. | `DetalleFactura.jsx` |
+
+Nota: la hoja imprimible (`FacturaPDF.jsx`) se maqueta con **estilos en línea** (no Tailwind)
+para fidelidad de impresión, y se mantiene oculta fuera de pantalla
+(`position:absolute; left:-9999px`) para poder capturarla sin que el usuario la vea.
+
+## PWA (app instalable / offline)
+
+| Tecnología | Para qué | Dónde se usa |
+|---|---|---|
+| **vite-plugin-pwa** | Convierte la web en PWA: genera automáticamente el Service Worker y el manifest. | `vite.config.js` (`VitePWA({...})`) |
+| **Service Worker** (`dist/sw.js`) | Cachea la app para que funcione **sin internet** tras la primera carga. Lo genera el plugin. | Generado en el build |
+| **Web App Manifest** | Define nombre, icono y colores al instalar la app (`display: standalone` = a pantalla completa, sin barra del navegador). | Generado en el build; iconos en `public/` |
+
 ## Código propio (lógica de negocio)
 
 | Archivo | Para qué |
 |---|---|
-| `src/utils/calculos.js` | Calcular base imponible y total (lógica pura, separada de React). |
-| `src/utils/numeracion.js` | Generar el número correlativo `F-2026-001`. |
+| `src/utils/calculos.js` | `calcularTotalMateriales` (suma de materiales), `calcularBaseImponible` (materiales + mano de obra) y `calcularTotal` (base + IVA). Lógica pura, separada de React. |
+| `src/utils/numeracion.js` | Generar el número correlativo `F-2026-001` (`generarSiguienteNumero`). |
+| `src/components/FacturaPDF.jsx` | Componente de la "hoja imprimible" de la factura (recibe `factura` y `config` por props). |
 
 ## Conceptos de React aplicados
 
@@ -39,6 +60,12 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 - **Hooks**: funciones `useX` que aportan capacidades (estado, efectos, formularios...).
   Reglas: solo en el nivel superior del componente y solo dentro de componentes/otros hooks.
 - **`useEffect`**: ejecutar código al montar una pantalla (p. ej. cargar datos).
+- **`useRef`**: guarda una referencia a un elemento del DOM real (p. ej. la hoja a
+  capturar para el PDF). Sobrevive entre re-renders y no provoca repintados.
+- **`props`**: datos que un componente recibe "desde fuera", como argumentos de una
+  función (`<FacturaPDF factura={factura} config={config} />`).
+- **Ámbito (scope)**: las funciones que usan datos del componente deben estar DENTRO de
+  la función del componente; fuera, esas variables no existen.
 - **Renderizado reactivo**: al cambiar un dato, la UI se repinta sola (totales en vivo,
   lista con `useLiveQuery`).
 
@@ -62,7 +89,7 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 
 **Configuración del taller** (registro único, `id: 1`)
 ```js
-{ id: 1, nombre, nif, direccion, telefono, logo }
+{ id: 1, nombre, titular, nif, actividad, direccion, telefono, logo }
 ```
 
 Decisiones de diseño:
@@ -106,8 +133,22 @@ Cómo distinguirlas de un vistazo:
 
 El nombre `.jsx` (en vez de `.js`) es la pista de que dentro hay JSX además de JavaScript.
 
-## Pendiente en el plan
+## Estado del plan (MVP)
 
-- **Paso 4 — PDF**: `jsPDF` (+ `html2canvas`) y **Web Share API** para exportar/compartir.
-- **Paso 5 — PWA**: `Vite PWA Plugin` (Service Worker + Web App Manifest) para instalar
-  en el móvil y funcionar sin conexión.
+1. ✅ Proyecto React + Vite
+2. ✅ Modelo de datos (Dexie + funciones de cálculo)
+3. ✅ Pantallas: lista, crear factura, detalle, configuración
+4. ✅ Generación de PDF (html2canvas-pro + jsPDF + Web Share API)
+5. ✅ PWA instalable (vite-plugin-pwa)
+
+**MVP completo.**
+
+## Mejoras futuras / pendiente
+
+- **Desplegar** en Vercel o Netlify (build → `dist/`) para tener una URL `https://` real
+  con la que instalar la PWA en el móvil (localhost solo sirve para probar en el PC) y
+  como enlace de portfolio.
+- **README** del repositorio (usar este documento como base).
+- **Logo real** del taller (el campo `logo` de la config aún no se usa).
+- **PDF multipágina** si alguna factura no cabe en un A4.
+- **Code-splitting** para reducir el tamaño del paquete JS (aviso del build).
