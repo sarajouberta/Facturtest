@@ -1,6 +1,6 @@
 // para realizar los cálculos del total de las facturas
 
-//suma de (cantidad × precio) de las líneas de materiales
+//uma de (cantidad × precio) de las líneas de materiales
 export function calcularTotalMateriales(conceptos) {
     return conceptos.reduce((suma, c) => {
         const cantidad = Number(c.cantidad) || 0
