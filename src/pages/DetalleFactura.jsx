@@ -38,18 +38,18 @@ function DetalleFactura() {
         const imagen = canvas.toDataURL('image/png')
 
         //2. Se crea un PDF A4 vertical, centrado en horizontal y pegado arriba:
-          const pdf = new jsPDF('p', 'mm', 'a4')
-          const anchoPag = pdf.internal.pageSize.getWidth()
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const anchoPag = pdf.internal.pageSize.getWidth()
 
-          const margen = 10 //margen (mm) a los lados y arriba
-          const ratio = canvas.width / canvas.height //identifica orientación (<1: vertical, >1: horizontal)
+        const margen = 10 //margen (mm) a los lados y arriba
+        const ratio = canvas.width / canvas.height //identifica orientación (<1: vertical, >1: horizontal)
 
-          const anchoImg = anchoPag - margen * 2 //a lo ancho, dejando margen lateral
-          const altoImg = anchoImg / ratio  //alto proporcional (puede sobrar por abajo)
+        const anchoImg = anchoPag - margen * 2 //a lo ancho, dejando margen lateral
+        const altoImg = anchoImg / ratio  //alto proporcional (puede sobrar por abajo)
 
-          const x = margen // centrada: mismo margen a izquierda y derecha
-          const y = margen // margen superior pequeño (cerca del borde de arriba)
-          pdf.addImage(imagen, 'PNG', x, y, anchoImg, altoImg)
+        const x = margen // centrada: mismo margen a izquierda y derecha
+        const y = margen // margen superior pequeño (cerca del borde de arriba)
+        pdf.addImage(imagen, 'PNG', x, y, anchoImg, altoImg)
 
         //3. Se genera el archivo
         const nombreArchivo = `${factura.numero}.pdf`
@@ -155,8 +155,8 @@ function DetalleFactura() {
                 </button>
             </div>
 
-            {/* Vista previa de la factura imprimible (temporal) : se conecta aquí al referencia a la hoja (ref)*/}
-            <div style={{ marginTop: '32px', width: '760px' }} ref={hojaRef}>
+            {/* La hoja imprimible: fuera de pantalla, solo para poder capturarla al exportar */}
+            <div style={{ position: 'absolute', left: '-9999px', top: 0, width: '760px' }} ref={hojaRef}>
                 <FacturaPDF factura={factura} config={config} />
             </div>
         </div>
