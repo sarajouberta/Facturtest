@@ -157,9 +157,14 @@ explicaciones de configuración van aquí, en la documentación, y no dentro del
 
 ## Mejoras futuras / pendiente
 
-- **Desplegar** en Vercel o Netlify (build → `dist/`) para tener una URL `https://` real
-  con la que instalar la PWA en el móvil (localhost solo sirve para probar en el PC) y
-  como enlace de portfolio.
+- **Onboarding de configuración**: si no hay datos del taller guardados, llevar al
+  usuario directamente a la pantalla de Configuración (en vez de a la lista). Evita que
+  se generen facturas con la cabecera vacía la primera vez que se instala en un móvil.
+- **Validaciones** en los campos de los formularios (obligatorios, formatos de NIF,
+  importes numéricos válidos, etc.) usando las validaciones de React Hook Form.
+- **Quitar los `0` como placeholder** en los campos de importe: al pulsar en un campo
+  numérico (precio, mano de obra…) el `0` inicial molesta; que el campo aparezca vacío o
+  se borre el 0 al enfocarlo.
 - **README** del repositorio (usar este documento como base).
 - **Logo real** del taller (el campo `logo` de la config aún no se usa).
 - **PDF multipágina** si alguna factura no cabe en un A4.
