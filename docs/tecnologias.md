@@ -132,6 +132,38 @@ importe queda siempre a 2 decimales en el formulario, la base de datos y el PDF.
 siguiendo el ciclo **TDD rojo → verde**: primero un test que falla evidenciando el error,
 luego el arreglo en el código de negocio, y el test pasa a verde confirmando la corrección.
 
+### Estrategia de testing a futuro: la pirámide
+
+Lo hecho hasta ahora (Vitest sobre `src/utils/`) es la **base** de una estrategia más
+amplia. La idea clásica es la *pirámide de testing*: muchos tests baratos abajo, pocos
+tests caros arriba.
+
+```
+        /\      pocos   → E2E: recorren la app entera como un usuario
+       /  \     algunos → componente: un formulario reacciona bien
+      /____\    muchos  → unitario: lógica pura  ← lo que YA tenemos
+```
+
+| Capa | Qué prueba | Herramienta (JS) | ¿Navegador? | Equivalente en Java |
+|---|---|---|---|---|
+| **Unitario** (hecho) | Una función aislada (cálculos, numeración). | **Vitest** | No (Node) | JUnit sobre una clase de lógica |
+| **Componente** (futuro) | Un componente React: escribir en un campo y ver que aparece el error, etc. | **React Testing Library** + `jsdom` | Simulado (DOM en memoria) | *(no hay equivalente directo)* |
+| **End-to-end** (futuro) | La app completa navegando de pantalla en pantalla. | **Playwright** / Cypress | Real | **Selenium** WebDriver |
+
+**Nota didáctica (paralelismo con Java):** los tests **E2E** con Playwright/Cypress son el
+equivalente moderno de **Selenium** — abren un navegador de verdad y automatizan a un
+usuario (localizar campo → escribir → clic → comprobar). Selenium también existe para JS,
+pero Playwright/Cypress lo han desplazado por ser más rápidos y estables (esperan solos a
+que los elementos aparezcan, sin `sleep`/`wait` manuales). En cambio, **React Testing
+Library NO** es como Selenium: usa un DOM *simulado* (`jsdom`), sin navegador real, para
+probar un componente aislado.
+
+**Regla de diseño que se repite:** cuanto más se mueva la lógica a **funciones puras** (en
+`src/utils/`), más se cubre con tests unitarios baratos y menos se depende de los caros. Por
+eso, cuando se implementen las **validaciones**, la estrategia será sacar las reglas a
+funciones puras (p. ej. `esNifValido(nif)`) y testearlas como los cálculos de hoy; y solo
+si se quiere, añadir uno o dos tests de componente por encima.
+
 ## Conceptos de React aplicados
 
 - **Componentes**: piezas de UI reutilizables.
