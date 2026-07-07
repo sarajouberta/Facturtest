@@ -290,6 +290,34 @@ El nombre `.jsx` (en vez de `.js`) es la pista de que dentro hay JSX además de 
 
 **Extra (post-MVP):** ✅ Tests automáticos con Vitest sobre la lógica de negocio
 (12 tests) + corrección del redondeo de importes (coma flotante). Ver sección *Testing*.
+✅ Onboarding de primer uso. Ver sección *Onboarding*.
+
+## Onboarding (primer uso)
+
+Al instalar la app en un dispositivo nuevo, la base de datos está vacía y **no hay datos
+del taller** (la Configuración es por-dispositivo, ver *Arquitectura de datos*). Sin esto,
+el usuario podría crear facturas con la cabecera del PDF en blanco (sin nombre, NIF ni
+teléfono del taller). El onboarding lo evita guiando al usuario a configurarse primero.
+
+Dos piezas, ambas guiadas por si existe o no el registro de configuración (`db.config.get(1)`):
+
+1. **Redirección** (`ListaFacturas.jsx`): la pantalla de inicio (`/`) comprueba la config y,
+   si no hay, redirige a `/configuracion` con `<Navigate to="/configuracion" replace />`.
+   - **`replace`** sustituye la entrada del historial (no la añade), para que "atrás" desde
+     Configuración no devuelva a `/` y provoque un bucle de redirección.
+2. **Mensaje de bienvenida** (`Configuracion.jsx`): la primera vez (sin config guardada) se
+   muestra un aviso "👋 completa los datos de tu taller", con renderizado condicional
+   (`{primeraVez && (...)}`) sobre un estado `useState`.
+
+**Detalle técnico importante — distinguir "cargando" de "vacío":** `useLiveQuery` devuelve
+`undefined` mientras carga, y `db.config.get(1)` **también** devuelve `undefined` si no hay
+config. Para no redirigir por error durante el instante de carga, la consulta convierte el
+"no encontrado" en `null` explícito con `?? null`, logrando tres estados distinguibles:
+
+```js
+const config = useLiveQuery(() => db.config.get(1).then((c) => c ?? null))
+// undefined → cargando  |  null → sin config (onboarding)  |  objeto → hay config
+```
 
 ## Despliegue
 
@@ -305,9 +333,6 @@ explicaciones de configuración van aquí, en la documentación, y no dentro del
 
 ## Mejoras futuras / pendiente
 
-- **Onboarding de configuración**: si no hay datos del taller guardados, llevar al
-  usuario directamente a la pantalla de Configuración (en vez de a la lista). Evita que
-  se generen facturas con la cabecera vacía la primera vez que se instala en un móvil.
 - **Validaciones** en los campos de los formularios (obligatorios, formatos de NIF,
   importes numéricos válidos, etc.) usando las validaciones de React Hook Form.
 - **Quitar los `0` como placeholder** en los campos de importe: al pulsar en un campo
