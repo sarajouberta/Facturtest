@@ -33,4 +33,8 @@ import { defineConfig } from 'vite'
         },
       }),
     ],
+    test: {
+        globals: true,
+        environment: 'node',
+      },
   })
