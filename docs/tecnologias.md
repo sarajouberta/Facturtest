@@ -11,6 +11,30 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 | **Vite** | Crea el proyecto, arranca el servidor local (`localhost:5173`) y recarga al guardar. | `vite.config.js` |
 | **React** | Librería de interfaz: la UI se divide en *componentes* (funciones que devuelven JSX). | Todos los `.jsx` |
 
+### ¿Qué es Vite exactamente?
+
+Vite (francés, "rápido") NO es una librería que se ejecute dentro de la app (como React o
+Dexie), sino una **herramienta de desarrollo y construcción**. Hace dos trabajos:
+
+1. **Servidor de desarrollo** (`npm run dev`): sirve la app en `localhost:5173` con
+   arranque instantáneo y **hot reload** (al guardar, el navegador se actualiza solo sin
+   recargar toda la página).
+2. **Empaquetador para producción** (`npm run build`): coge todo el código (`.jsx`, CSS,
+   imágenes, librerías) y lo transforma y optimiza en pocos archivos finales pequeños y
+   rápidos (carpeta `dist/`), listos para desplegar.
+
+**Por qué hace falta**: el navegador no entiende directamente el JSX, ni los `import` de
+CSS/imágenes, ni el código repartido en muchos archivos. Vite es el "traductor y
+organizador" que convierte el código cómodo de escribir en algo que el navegador sabe
+ejecutar.
+
+**Analogía**: es el equivalente frontend de **Maven/Gradle** en Java — compila y empaqueta
+el proyecto (código fuente → web optimizada), y además da el servidor de desarrollo con
+recarga en caliente. Sustituye a la antigua Create React App (más lenta, ya en desuso).
+
+Comandos (en `package.json`): `npm run dev` (desarrollo), `npm run build` (producción),
+`npm run preview` (previsualizar el build). Se configura en `vite.config.js`.
+
 ## Navegación y estilos
 
 | Tecnología | Para qué | Dónde se usa |
@@ -53,6 +77,60 @@ para fidelidad de impresión, y se mantiene oculta fuera de pantalla
 | `src/utils/calculos.js` | `calcularTotalMateriales` (suma de materiales), `calcularBaseImponible` (materiales + mano de obra) y `calcularTotal` (base + IVA). Lógica pura, separada de React. |
 | `src/utils/numeracion.js` | Generar el número correlativo `F-2026-001` (`generarSiguienteNumero`). |
 | `src/components/FacturaPDF.jsx` | Componente de la "hoja imprimible" de la factura (recibe `factura` y `config` por props). |
+
+## Testing (pruebas automáticas)
+
+| Tecnología | Para qué | Dónde se usa |
+|---|---|---|
+| **Vitest** | Framework de tests integrado con Vite (el equivalente a **JUnit** en Java). Ejecuta pruebas que comprueban que las funciones devuelven lo esperado. | `vite.config.js` (bloque `test`), archivos `*.test.js` |
+
+Se instala como dependencia de desarrollo (`npm install -D vitest`): solo se usa para
+programar/probar, **no** forma parte de la app desplegada (como el `<scope>test</scope>`
+de Maven). Comparte la configuración de Vite; se activa con un bloque en `vite.config.js`:
+
+```js
+test: { globals: true, environment: 'node' }
+```
+
+- **`globals: true`** → permite usar `describe`, `test`, `expect` sin importarlos en cada archivo.
+- **`environment: 'node'`** → los tests corren en Node, sin simular navegador (no hace
+  falta: probamos lógica pura, no interfaz). Por eso **no** se necesita `jsdom` ni React Testing Library.
+
+**Qué se prueba**: solo la **lógica de negocio pura** de `src/utils/` (los cálculos y la
+numeración). Es lo de mayor valor y lo más fácil de testear, precisamente porque está
+separada de React (sin UI, sin base de datos → funciones que reciben datos y devuelven un
+resultado). No se testean componentes ni flujos de navegador (mayor esfuerzo, menor retorno para este proyecto).
+
+| Archivo de test | Cubre | Casos incluidos |
+|---|---|---|
+| `src/utils/calculos.test.js` | `calcularTotalMateriales`, `calcularBaseImponible`, `calcularTotal` | suma de materiales, lista vacía, mano de obra vacía (`''` → 0), IVA 21%, IVA 0, redondeo a 2 decimales |
+| `src/utils/numeracion.test.js` | `generarSiguienteNumero` | primer número (`001`), siguiente al más alto, ceros a la izquierda (`9 → 010`), filtrado por año, uso del máximo (no del conteo) para no repetir número |
+
+12 tests en total. Estructura de cada test: patrón **Arrange · Act · Assert**
+(preparar los datos → ejecutar la función → comprobar el resultado con `expect(...).toBe(...)`).
+
+**Scripts** (en `package.json`):
+- `npm test` → modo *watch*: se queda vigilando y re-ejecuta los tests al guardar (día a día).
+- `npm run test:run` → una sola pasada y termina, devolviendo OK/fallo (para CI, p. ej. GitHub Actions).
+
+### Bug encontrado gracias a los tests: coma flotante en el dinero
+
+Al testear los importes salió a la luz un problema clásico y serio en apps de dinero: los
+ordenadores guardan los decimales en binario (estándar **IEEE 754**) y números como `0.1`
+no tienen representación exacta. Resultado real:
+
+```js
+3 * 0.1        // → 0.30000000000000004  (¡no 0.3!)
+0.1 + 0.2      // → 0.30000000000000004
+```
+
+Sin corregirlo, un total podría mostrarse como `12,340000000001 €` en el PDF. Pasa también
+en Java (`double`), Python, C… no es un fallo de JS. **Solución** aplicada en `calculos.js`:
+una función `redondear(n) = Math.round(n * 100) / 100` que se aplica al resultado de las tres
+funciones de dinero (multiplica por 100 → redondea al entero → divide por 100). Así el
+importe queda siempre a 2 decimales en el formulario, la base de datos y el PDF. Se arregló
+siguiendo el ciclo **TDD rojo → verde**: primero un test que falla evidenciando el error,
+luego el arreglo en el código de negocio, y el test pasa a verde confirmando la corrección.
 
 ## Conceptos de React aplicados
 
@@ -99,6 +177,41 @@ Decisiones de diseño:
 - Modelo ampliado tras analizar la factura de papel real del taller (vehículo, mano de
   obra separada, cliente completo, trabajos realizados).
 
+## Arquitectura de datos: base de datos por dispositivo
+
+Facturtest **no tiene servidor ni base de datos central**. Cada dispositivo guarda los
+datos **dentro de su propio navegador**, en **IndexedDB** (la BD integrada en todos los
+navegadores), a la que se accede mediante Dexie.js.
+
+Comparación:
+
+```
+App clásica (con servidor):
+  varios dispositivos ──► SERVIDOR ──► una BD central (datos compartidos)
+
+Facturtest (sin servidor):
+  móvil del padre ──► su propia BD (en el móvil)
+  PC de Sara      ──► su propia BD (en el navegador)
+```
+
+**Consecuencias** (cada BD es independiente y aislada):
+- Las facturas creadas en un dispositivo solo existen en ese dispositivo.
+- La **Configuración del taller** hay que rellenarla en cada dispositivo (si no, el PDF
+  sale con la cabecera vacía).
+- No hay sincronización entre dispositivos; incluso Chrome y Firefox del mismo equipo
+  tienen bases de datos separadas.
+
+**Por qué se eligió así** (adecuado para el caso: un taller, un móvil, una persona):
+- Cero coste (sin servidor que pagar/mantener).
+- Funciona **sin internet** (los datos están en el propio dispositivo → habilita la PWA offline).
+- Privacidad total (los datos no salen del dispositivo).
+- Simplicidad (sin backend, login ni seguridad de red).
+
+**Si en el futuro se quisiera compartir entre dispositivos / copia en la nube**: haría
+falta un backend (Node/Express, Spring…) con una BD central (PostgreSQL, MongoDB…) y que
+la app hablara con él por internet. Añade complejidad; para el MVP no era necesario.
+Alternativa intermedia y sencilla: exportar/importar las facturas a un archivo (backup).
+
 ## Anatomía de un archivo `.jsx` — las 3 capas
 
 Un componente React (`.jsx`) NO es solo JavaScript: mezcla **tres capas** en el mismo
@@ -142,6 +255,9 @@ El nombre `.jsx` (en vez de `.js`) es la pista de que dentro hay JSX además de 
 5. ✅ PWA instalable (vite-plugin-pwa)
 
 **MVP completo.**
+
+**Extra (post-MVP):** ✅ Tests automáticos con Vitest sobre la lógica de negocio
+(12 tests) + corrección del redondeo de importes (coma flotante). Ver sección *Testing*.
 
 ## Despliegue
 
