@@ -86,7 +86,7 @@ export default Configuracion
 /*Nota: cambios para incorporar onboarding:
 - useState: recuerda un dato entre renders. Aquí, "¿es la primera vez?". Como ya consultábamos la config en el useEffect, no hacemos ninguna consulta extra: reutilizamos esa misma
   respuesta.
-  - {primeraVez && (...)}: renderizado condicional (ya lo usas en otras pantallas): si primeraVez es true, se pinta el <p>; si es false, no aparece nada. Cuando ya hay datos
+  - {primeraVez && (...)}: renderizado condicional:  si primeraVez es true, se pinta el <p>; si es false, no aparece nada. Cuando ya hay datos
   guardados, el mensaje no molesta.
 
  */
