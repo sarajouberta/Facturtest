@@ -3,6 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { db } from '../db'
 import { generarSiguienteNumero } from '../utils/numeracion'
+import { nifValido, telefonoValido } from '../utils/validaciones'
 import {
   calcularTotalMateriales,
   calcularBaseImponible,
@@ -10,7 +11,8 @@ import {
 } from '../utils/calculos'
 
 function NuevaFactura() {
-  const { register, control, handleSubmit, watch, setValue } = useForm({
+  const { register, control, handleSubmit, watch, setValue, setError,
+    formState: { errors } } = useForm({
     defaultValues: {
       numero: '',
       fecha: new Date().toISOString().slice(0, 10),
@@ -58,6 +60,16 @@ function NuevaFactura() {
       datos.manoDeObra)
     const total = calcularTotal(baseImponible, datos.iva)
 
+    // Regla de negocio: la factura debe tener algún importe.
+    // Si no hay piezas, la mano de obra tiene que cubrirla.
+    if (baseImponible <= 0) {
+      setError('manoDeObra', {
+        type: 'manual',
+        message: 'La factura debe tener piezas o mano de obra (no puede ser 0 €)',
+      })
+      return
+    }
+
     await db.facturas.add({ ...datos, totalMateriales, baseImponible, total })
     navigate('/')
   }
@@ -73,8 +85,12 @@ function NuevaFactura() {
           <legend className="font-semibold px-1">Factura</legend>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Número</span>
-            <input className="border rounded px-3 py-2" {...register('numero')}
+            <input className="border rounded px-3 py-2"
+              {...register('numero', { required: 'El número es obligatorio' })}
             />
+            {errors.numero && (
+              <span className="text-red-600 text-sm">{errors.numero.message}</span>
+            )}
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Fecha</span>
@@ -87,9 +103,18 @@ function NuevaFactura() {
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Cliente</legend>
           <input className="border rounded px-3 py-2" placeholder="Nombre"
-            {...register('cliente.nombre')} />
+            {...register('cliente.nombre',{ required: 'El nombre del cliente es obligatorio' })} />
+            {errors.cliente?.nombre && (
+              <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
+            )}
           <input className="border rounded px-3 py-2" placeholder="DNI / CIF"
-            {...register('cliente.nif')} />
+            {...register('cliente.nif', {
+              required: 'El DNI del cliente es obligatorio',
+              validate: (v) => nifValido(v) || 'DNI/CIF no válido',
+            })} />
+            {errors.cliente?.nif && (
+              <span className="text-red-600 text-sm">{errors.cliente.nif.message}</span>
+            )}
           <input className="border rounded px-3 py-2" placeholder="Domicilio"
             {...register('cliente.direccion')} />
           <input className="border rounded px-3 py-2" placeholder="Localidad"
@@ -97,18 +122,32 @@ function NuevaFactura() {
           <input className="border rounded px-3 py-2" placeholder="Provincia"
             {...register('cliente.provincia')} />
           <input className="border rounded px-3 py-2" placeholder="Teléfono"
-            {...register('cliente.telefono')} />
+            {...register('cliente.telefono', {
+              validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
+            })} />
+            {errors.cliente?.telefono && (
+              <span className="text-red-600 text-sm">{errors.cliente.telefono.message}</span>
+            )}
         </fieldset>
 
         {/* Datos del vehículo */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Vehículo</legend>
           <input className="border rounded px-3 py-2" placeholder="Modelo"
-            {...register('vehiculo.modelo')} />
+            {...register('vehiculo.modelo', { required: 'El modelo es obligatorio' })} />
+          {errors.vehiculo?.modelo && (
+            <span className="text-red-600 text-sm">{errors.vehiculo.modelo.message}</span>
+          )}
           <input className="border rounded px-3 py-2" placeholder="Vehículo"
-            {...register('vehiculo.vehiculo')} />
+            {...register('vehiculo.vehiculo', { required: 'El vehículo (marca) es obligatorio' })} />
+          {errors.vehiculo?.vehiculo && (
+            <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
+          )}
           <input className="border rounded px-3 py-2" placeholder="Matrícula"
-            {...register('vehiculo.matricula')} />
+            {...register('vehiculo.matricula', { required: 'La matrícula es obligatoria' })} />
+          {errors.vehiculo?.matricula && (
+            <span className="text-red-600 text-sm">{errors.vehiculo.matricula.message}</span>
+          )}
           <input className="border rounded px-3 py-2" placeholder="Km"
             {...register('vehiculo.km')} />
         </fieldset>
@@ -136,21 +175,24 @@ function NuevaFactura() {
               />
               <input
                 type="number"
+                min="1"
                 className="border rounded px-3 py-2 w-20"
                 placeholder="Cant."
                 {...register(`conceptos.${index}.cantidad`, {
-                  valueAsNumber:
-                    true
+                  valueAsNumber: true,
+                  min: { value: 1, message: 'La cantidad mínima es 1' },
                 })}
                 onFocus={(e) => e.target.select()}
               />
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 className="border rounded px-3 py-2 w-24"
                 placeholder="Precio"
                 {...register(`conceptos.${index}.precioUnitario`, {
-                  valueAsNumber: true
+                  valueAsNumber: true,
+                  min: { value: 0, message: 'El precio no puede ser negativo' },
                 })}
                 onFocus={(e) => e.target.select()}
               />
@@ -160,6 +202,11 @@ function NuevaFactura() {
               </button>
             </div>
           ))}
+          {errors.conceptos && (
+            <span className="text-red-600 text-sm">
+              Revisa las cantidades y los precios de los materiales.
+            </span>
+          )}
           <button
             type="button"
             onClick={() => append({
@@ -180,19 +227,35 @@ function NuevaFactura() {
             <input
               type="number"
               step="0.01"
+              min="0"
               className="border rounded px-3 py-2"
-              {...register('manoDeObra', { valueAsNumber: true })}
+              {...register('manoDeObra', {
+                valueAsNumber: true,
+                min: { value: 0, message: 'La mano de obra no puede ser negativa' },
+              })}
               onFocus={(e) => e.target.select()}
             />
+            {errors.manoDeObra && (
+              <span className="text-red-600 text-sm">{errors.manoDeObra.message}</span>
+            )}
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">IVA (%)</span>
             <input
               type="number"
+              min="0"
+              max="100"
               className="border rounded px-3 py-2"
-              {...register('iva', { valueAsNumber: true })}
+              {...register('iva', {
+                valueAsNumber: true,
+                min: { value: 0, message: 'El IVA debe estar entre 0 y 100' },
+                max: { value: 100, message: 'El IVA debe estar entre 0 y 100' },
+              })}
               onFocus={(e) => e.target.select()}
             />
+            {errors.iva && (
+              <span className="text-red-600 text-sm">{errors.iva.message}</span>
+            )}
           </label>
         </fieldset>
 

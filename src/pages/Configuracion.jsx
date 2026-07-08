@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { db } from '../db'
 import { useNavigate } from 'react-router-dom'
+import { nifValido, telefonoValido } from '../utils/validaciones'
 
 
 function Configuracion() {
-  const { register, handleSubmit, reset } = useForm()
+  const { register, handleSubmit, reset, formState: { errors } } = useForm()
 
   //
   const navigate = useNavigate()
@@ -58,7 +59,14 @@ function Configuracion() {
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">NIF</span>
-          <input className="border rounded px-3 py-2" {...register('nif')} />
+          <input className="border rounded px-3 py-2"
+            {...register('nif', {
+              required: 'El NIF del taller es obligatorio',
+              validate: (v) => nifValido(v) || 'NIF no válido',
+            })} />
+          {errors.nif && (
+            <span className="text-red-600 text-sm">{errors.nif.message}</span>
+          )}
         </label>
 
         <label className="flex flex-col gap-1">
@@ -74,8 +82,13 @@ function Configuracion() {
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Teléfono</span>
-          <input className="border rounded px-3 py-2" {...register('telefono')}
-          />
+          <input className="border rounded px-3 py-2"
+            {...register('telefono', {
+              validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
+            })} />
+          {errors.telefono && (
+            <span className="text-red-600 text-sm">{errors.telefono.message}</span>
+          )}
         </label>
 
         <button
