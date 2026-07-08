@@ -142,6 +142,7 @@ function NuevaFactura() {
                   valueAsNumber:
                     true
                 })}
+                onFocus={(e) => e.target.select()}
               />
               <input
                 type="number"
@@ -151,6 +152,7 @@ function NuevaFactura() {
                 {...register(`conceptos.${index}.precioUnitario`, {
                   valueAsNumber: true
                 })}
+                onFocus={(e) => e.target.select()}
               />
               <button type="button" onClick={() => remove(index)}
                 className="text-red-600 px-2">
@@ -180,6 +182,7 @@ function NuevaFactura() {
               step="0.01"
               className="border rounded px-3 py-2"
               {...register('manoDeObra', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
             />
           </label>
           <label className="flex flex-col gap-1">
@@ -188,6 +191,7 @@ function NuevaFactura() {
               type="number"
               className="border rounded px-3 py-2"
               {...register('iva', { valueAsNumber: true })}
+              onFocus={(e) => e.target.select()}
             />
           </label>
         </fieldset>
