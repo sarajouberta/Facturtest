@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { db } from '../db'
+import { useNavigate } from 'react-router-dom'
+
 
 function Configuracion() {
   const { register, handleSubmit, reset } = useForm()
+
+  //
+  const navigate = useNavigate()
 
   //para onboarding:
   const [primeraVez, setPrimeraVez] = useState(false)
@@ -20,7 +25,11 @@ function Configuracion() {
   //al pulsar "Guardar", se escribe en la base de datos
   const onSubmit = async (datos) => {
     await db.config.put({ ...datos, id: 1 })
-    alert('Datos del taller guardados')
+      if (primeraVez) {
+        navigate('/')            // primera vez: redirige a la pantalla principal
+      } else {
+        alert('Datos del taller guardados')   // editando: confirmamos y nos quedamos
+      }
   }
 
   return (
@@ -86,7 +95,8 @@ export default Configuracion
 /*Nota: cambios para incorporar onboarding:
 - useState: recuerda un dato entre renders. Aquí, "¿es la primera vez?". Como ya consultábamos la config en el useEffect, no hacemos ninguna consulta extra: reutilizamos esa misma
   respuesta.
-  - {primeraVez && (...)}: renderizado condicional:  si primeraVez es true, se pinta el <p>; si es false, no aparece nada. Cuando ya hay datos
+  - {primeraVez && (...)}: renderizado condicional: 
+   si primeraVez es true, se pinta el <p>; si es false, no aparece nada. Cuando ya hay datos
   guardados, el mensaje no molesta.
 
  */
