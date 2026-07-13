@@ -5,6 +5,58 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-13 — Sincronización multi-dispositivo con Firebase (Fases 1-3)
+
+Mejora pedida por el titular del taller: poder usar la app en el **móvil y en el escritorio
+con los mismos datos** (hoy cada dispositivo tiene su propia IndexedDB aislada). Requisitos:
+**gratis** y ligado a la **cuenta de Google**.
+
+### Decisión de arquitectura: Firebase (no Google Drive)
+- Se elige **Firebase** (Firestore + Authentication con Google), plan **Spark (gratuito)**.
+  - *Por qué frente a Drive:* pensando en un posible salto futuro a **app nativa / Play
+    Store**, con Firebase la **capa de datos no cambia** (Firestore tiene SDK nativo); solo
+    se repintaría la interfaz. Con Drive habría que reimplementar el sync en nativo.
+  - *Modelo de sync:* como en la práctica hay **un solo editor** (el padre, casi siempre en
+    el móvil; el escritorio es para ver/copia), NO hace falta sync bidireccional con
+    conflictos: basta "última escritura gana". Esto absorbe el pendiente de *backup*.
+
+### Fase 1 — Proyecto en la consola de Firebase (sin código)
+- Proyecto `facturtest-6b96e`. Activados **Firestore** (BD `(default)`, en modo de prueba,
+  temporal) y **Authentication** con proveedor **Google**. Registrada la app web.
+
+### Fase 2 — SDK e inicialización
+- `npm install firebase` (v12) y nuevo **`src/firebase.js`**: inicializa Firebase una vez y
+  exporta `auth`, `googleProvider` y `firestore`.
+  - *Detalle de nombres:* la BD de Firebase se exporta como **`firestore`**, no `db`, para no
+    chocar con el `db` de Dexie (`src/db.js`).
+  - *Claves:* en **`.env.local`** (ignorado por git vía `*.local`) con prefijo **`VITE_`**
+    (Vite solo expone al navegador las variables con ese prefijo). Plantilla documentada en
+    **`.env.example`**. Las claves web de Firebase no son secretas, pero se centralizan así.
+
+### Fase 3 — Login con Google
+- **`src/auth/AuthContext.jsx`**: Context de React con el hook `useAuth`. Escucha
+  `onAuthStateChanged` (Firebase avisa de cada cambio de sesión, también al recargar) y
+  expone `usuario`, `entrar()` (`signInWithPopup`) y `salir()` (`signOut`).
+  - *Por qué un Context:* "quién está logueado" lo necesitan muchos componentes; centralizarlo
+    evita pasar props en cascada.
+  - *Limpieza:* el `useEffect` devuelve la función de desuscripción de `onAuthStateChanged`
+    para no dejar fugas.
+- Envuelto en `main.jsx` (`<AuthProvider>`) y botón **entrar/salir** en la cabecera de
+  `App.jsx`. La app **aún no se bloquea** tras el login (se decidirá en la Fase 4).
+
+### Pendiente (próximas fases)
+- **Fase 4:** capa de datos — decidir **sustituir Dexie por Firestore** (offline integrado →
+  sync en tiempo real casi gratis) vs. mantener ambos. Es la fase que más código toca.
+- **Fase 5:** reglas de seguridad de Firestore (cada usuario solo ve sus datos; hoy está en
+  modo de prueba, abierto).
+- **Fase 6:** probar en dos dispositivos reales.
+- **Para el deploy:** añadir las 6 variables `VITE_FIREBASE_*` en Vercel; añadir el dominio de
+  Vercel en Firebase → Authentication → Authorized domains; en móvil quizá cambiar
+  `signInWithPopup` por `signInWithRedirect`. El bundle creció a ~1,5 MB por el SDK
+  (candidato a code-splitting).
+
+---
+
 ## 2026-07-13 — Número inicial de factura configurable
 
 Mejora pedida por el titular del taller tras probar la app: poder **fijar desde qué número
