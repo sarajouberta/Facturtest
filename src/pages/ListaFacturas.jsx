@@ -10,7 +10,7 @@ function ListaFacturas() {
   const config = useLiveQuery(() => db.config.get(1).then((c) => c ?? null))
 
   // aún cargando datos de la BD
-  if (facturas === undefined || config=== undefined) return <p>Cargando…</p>
+  if (facturas === undefined || config== undefined) return <p>Cargando…</p>
 
   // no hay datos del taller todavía → llevar a Configuración (onboarding)
   if (config === null) return <Navigate to="/configuracion" replace />

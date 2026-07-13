@@ -1,19 +1,14 @@
-/*Filtra las facturas cuyo número empieza por F-2026-, extrae la parte numérica de cada una, coge la más alta, le suma 1 y la formatea a 3 dígitos con padStart(3, '0') (que
-  rellena con ceros a la izquierda: 7 → 007). Si no hay ninguna aún, empieza en 001*/
-
-//genera el siguiente número correlativo, tipo "F-2026-001"
-export function generarSiguienteNumero(facturas, anio) {
-    const prefijo = `F-${anio}-`
-
-    // Nos quedamos solo con las facturas de este año
-    const delAnio = facturas.filter((f) => f.numero?.startsWith(prefijo))
-
-    // Buscamos el número de secuencia más alto usado
-    const maxSecuencia = delAnio.reduce((max, f) => {
-        const secuencia = parseInt(f.numero.slice(prefijo.length), 10)
-        return secuencia > max ? secuencia : max
+// Genera el siguiente número de factura (cambio a numeración corrida, solo dígitos: 46, 47…).
+// -facturas: las que ya existen en la BD
+// -numeroInicial: punto de partida que el taller fija en Configuración
+export function generarSiguienteNumero(facturas, numeroInicial = 1) {
+    //el correlativo más alto que ya se ha usado (ignora textos no numéricos)
+    const maxUsado = facturas.reduce((max, f) => {
+        const n = parseInt(f.numero, 10)   //para descartar NaN
+        return Number.isNaN(n) ? max : Math.max(max, n)
     }, 0)
 
-    // El siguiente = el más alto + 1, con 3 dígitos (001, 002...)
-    return `${prefijo}${String(maxSecuencia + 1).padStart(3, '0')}`
+    //el siguiente es el mayor entre "el correlativo real" y "el punto de partida" puesto en COnfig:
+    const inicial = Number(numeroInicial) || 1
+    return String(Math.max(maxUsado + 1, inicial))
 }

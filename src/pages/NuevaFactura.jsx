@@ -45,12 +45,15 @@ function NuevaFactura() {
   const baseImponible = calcularBaseImponible(totalMateriales, manoDeObra)
   const total = calcularTotal(baseImponible, iva)
 
-  // Al abrir la pantalla, calculamos el siguiente número correlativo
+  //Al abrir la pantalla, se calcula el siguiente número correlativo
   useEffect(() => {
-    db.facturas.toArray().then((facturas) => {
-      const anio = new Date().getFullYear()
-      setValue('numero', generarSiguienteNumero(facturas, anio))
-    })
+    //se lanzan las dos consultas a la vez y se espera el resul
+    Promise.all([db.facturas.toArray(), db.config.get(1)]).then(
+      //config?: se cubre error si no hay config guardada (x si acaso)
+      ([facturas, config]) => {
+        setValue('numero', generarSiguienteNumero(facturas, config?.numeroInicial))
+      }
+    )
   }, [setValue])
 
   const onSubmit = async (datos) => {
@@ -60,8 +63,8 @@ function NuevaFactura() {
       datos.manoDeObra)
     const total = calcularTotal(baseImponible, datos.iva)
 
-    // Regla de negocio: la factura debe tener algún importe.
-    // Si no hay piezas, la mano de obra tiene que cubrirla.
+    //Regla de negocio: la factura debe tener algún importe.
+    //Cambio: aunque sean casos muy raros, la factura puede no tener mano de obra (ej. cambiar batería no la cobra)
     if (baseImponible <= 0) {
       setError('manoDeObra', {
         type: 'manual',
@@ -85,7 +88,7 @@ function NuevaFactura() {
           <legend className="font-semibold px-1">Factura</legend>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">Número</span>
-            <input className="border rounded px-3 py-2"
+            <input type="number" min="1" className="border rounded px-3 py-2"
               {...register('numero', { required: 'El número es obligatorio' })}
             />
             {errors.numero && (

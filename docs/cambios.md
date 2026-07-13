@@ -5,6 +5,42 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-13 — Número inicial de factura configurable
+
+Mejora pedida por el titular del taller tras probar la app: poder **fijar desde qué número
+empieza a facturar**, para enlazar con la numeración de su talonario de papel.
+
+### 1. Numeración corrida y solo numérica
+- El formato pasa de `F-2026-001` a un **número pelado** (`46`, `47`…). Se elimina el prefijo
+  y el año.
+  - *Por qué:* el taller numera sus facturas solo con dígitos, sin prefijos. Además, al
+    quitar el año desaparece un caso raro de cambio de ejercicio (2026 → 2027).
+- `generarSiguienteNumero(facturas, numeroInicial)`: nueva firma. El siguiente número es
+  `Math.max(correlativoReal + 1, numeroInicial)`.
+  - *Cómo funciona:* el número inicial solo manda **mientras nadie lo haya superado**; en
+    cuanto existe una factura más alta, gana el correlativo real de la base de datos.
+  - `parseInt` + descarte de `NaN`: una factura antigua con el formato viejo (`F-2026-001`)
+    no rompe el cálculo, simplemente no cuenta.
+
+### 2. Campo "Número inicial de factura" en Configuración
+- Nuevo `<input type="number">` (`numeroInicial`, con `valueAsNumber`), el primero del
+  formulario. No es obligatorio: si se deja vacío, la numeración arranca en `1`.
+
+### 3. `NuevaFactura` lee la config
+- El `useEffect` que sugiere el número pasa a cargar **facturas y config a la vez**
+  (`Promise.all`) y pasa `config?.numeroInicial` a la función. El input del número pasa a
+  `type="number"`. El campo sigue siendo **editable** a mano.
+
+### 4. Tests
+- `numeracion.test.js` reescrito para la nueva firma (6 casos: arranque desde el inicial,
+  correlativo normal, huecos, formato antiguo ignorado). El proyecto sigue en **28 tests**.
+
+### Nota pendiente
+- El comentario de `validaciones.js` (línea 3) dice que un CIF `B1234567` (8 caracteres) es
+  válido, pero la regex exige 9. Despiste del comentario, a cuadrar al subir el NIF a nivel B.
+
+---
+
 ## 2026-07-08 — Usabilidad, validación y limpieza del historial de Git
 
 Sesión centrada en pulir cosas detectadas **usando la app de verdad** (ya instalada y

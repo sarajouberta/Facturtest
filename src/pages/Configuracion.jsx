@@ -16,21 +16,21 @@ function Configuracion() {
 
   //al abrir la pantalla, se cargan los datos guardados (si existen)
   useEffect(() => {
-      db.config.get(1).then((config) => {
-        if (config) reset(config)
-        else setPrimeraVez(true)   // no hay datos == es la primera vez
-      })
-    }, [reset])
+    db.config.get(1).then((config) => {
+      if (config) reset(config)
+      else setPrimeraVez(true)   // no hay datos == es la primera vez
+    })
+  }, [reset])
 
 
   //al pulsar "Guardar", se escribe en la base de datos
   const onSubmit = async (datos) => {
     await db.config.put({ ...datos, id: 1 })
-      if (primeraVez) {
-        navigate('/')            // primera vez: redirige a la pantalla principal
-      } else {
-        alert('Datos del taller guardados')   // editando: confirmamos y nos quedamos
-      }
+    if (primeraVez) {
+      navigate('/')            // primera vez: redirige a la pantalla principal
+    } else {
+      alert('Datos del taller guardados')   // editando: confirmamos y nos quedamos
+    }
   }
 
   return (
@@ -38,13 +38,25 @@ function Configuracion() {
       <h2 className="text-xl font-bold mb-4">Configuración del taller</h2>
 
       {primeraVez && (
-          <p className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 mb-4 text-sm">
-            👋 ¡Bienvenido! Antes de crear facturas, completa los datos de tu taller.
-            Solo hay que hacerlo la primera vez.
-          </p>
-        )}
+        <p className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 mb-4 text-sm">
+          👋 ¡Bienvenido! Antes de crear facturas, completa los datos de tu taller.
+          Solo hay que hacerlo la primera vez.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1">
+        <span className="text-sm font-medium">Número inicial de factura</span>
+        <input type="number" min="1" className="border rounded px-3 py-2"
+          {...register('numeroInicial', {
+            valueAsNumber: true,
+            min: { value: 1, message: 'El número inicial debe ser 1 o mayor' },
+          })} />
+        {errors.numeroInicial && (
+          <span className="text-red-600 text-sm">{errors.numeroInicial.message}</span>
+        )}
+      </label>
+
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Nombre comercial</span>
           <input className="border rounded px-3 py-2" {...register('nombre')}
