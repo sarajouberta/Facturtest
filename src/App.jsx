@@ -4,8 +4,11 @@ import NuevaFactura from './pages/NuevaFactura'
 import Configuracion from './pages/Configuracion'
 import './App.css'
 import DetalleFactura from './pages/DetalleFactura'
+import { useAuth } from './auth/AuthContext'
 
 function App() {
+  const { usuario, cargando, entrar, salir } = useAuth()
+
   return (
     <div className="app">
       <header>
@@ -17,6 +20,19 @@ function App() {
           {' | '}
           <Link to="/configuracion">Configuración</Link>
         </nav>
+
+        {!cargando && (
+          usuario ? (
+            <div className="flex items-center gap-2 text-sm">
+              <span>{usuario.displayName || usuario.email}</span>
+              <button onClick={salir} className="text-blue-600 underline">Salir</button>
+            </div>
+          ) : (
+            <button onClick={entrar} className="bg-blue-600 text-white rounded px-3 py-1 text-sm">
+              Entrar con Google
+            </button>
+          )
+        )}
       </header>
 
       <main>
