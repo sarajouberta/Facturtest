@@ -1,11 +1,23 @@
-//Nota: cambios para cambiar la bdd Firebase
+import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useFacturas, useConfig } from '../datos'
+import { filtrarFacturas } from '../utils/busqueda'
+
+// Meses para el desplegable: [valor que se compara, nombre que se muestra].
+// El valor ('01'…'12') coincide con lo que hay en la fecha "AAAA-MM-DD".
+const MESES = [
+  ['01', 'Enero'], ['02', 'Febrero'], ['03', 'Marzo'], ['04', 'Abril'],
+  ['05', 'Mayo'], ['06', 'Junio'], ['07', 'Julio'], ['08', 'Agosto'],
+  ['09', 'Septiembre'], ['10', 'Octubre'], ['11', 'Noviembre'], ['12', 'Diciembre'],
+]
 
 function ListaFacturas() {
   //null = cargado pero sin config;  undefined = todavía cargando
   const facturas = useFacturas()
   const config = useConfig()
+  const [texto, setTexto] = useState('')
+  const [anio, setAnio] = useState('')
+  const [mes, setMes] = useState('')
 
 
   // aún cargando datos de la BD
@@ -14,6 +26,13 @@ function ListaFacturas() {
   // no hay datos del taller todavía → llevar a Configuración (onboarding)
   if (config === null) return <Navigate to="/configuracion" replace />
 
+  // Años presentes en las facturas, para rellenar el desplegable (sin repetir,
+  // de más nuevo a más antiguo). new Set() quita duplicados.
+  const anios = [...new Set(facturas.map((f) => (f.fecha ?? '').slice(0, 4)).filter(Boolean))]
+    .sort()
+    .reverse()
+
+  const facturasFiltradas = filtrarFacturas(facturas, { texto, anio, mes })
 
   return (
     <div className="max-w-2xl">
@@ -26,11 +45,48 @@ function ListaFacturas() {
           + Nueva
         </Link>
       </div>
+
+      {facturas.length > 0 && (
+        <div className="flex flex-col gap-2 mb-4">
+          <input
+            type="search"
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Buscar por nº de factura o matrícula (p. ej. 1234 ABC)"
+            className="w-full border rounded px-3 py-2"
+          />
+          <div className="flex gap-2">
+            <select
+              value={anio}
+              onChange={(e) => setAnio(e.target.value)}
+              className="border rounded px-3 py-2 flex-1"
+            >
+              <option value="">Año: todos</option>
+              {anios.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+            <select
+              value={mes}
+              onChange={(e) => setMes(e.target.value)}
+              className="border rounded px-3 py-2 flex-1"
+            >
+              <option value="">Mes: todos</option>
+              {MESES.map(([valor, nombre]) => (
+                <option key={valor} value={valor}>{nombre}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {facturas.length === 0 ? (
         <p className="text-gray-600">No hay facturas todavía.</p>
+      ) : facturasFiltradas.length === 0 ? (
+        <p className="text-gray-600">Ninguna factura coincide con el filtro.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {facturas.map((f) => (
+          {facturasFiltradas.map((f) => (
             <li key={f.id}>
               <Link
                 to={`/factura/${f.id}`}
