@@ -5,6 +5,46 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-16 — Bug: "Cargando…" eterno tras el login sin config
+
+Al entrar con Google **habiendo borrado la config del taller**, la app se quedaba clavada en
+`Cargando…` bajo el usuario, en vez de redirigir al onboarding (`/configuracion`).
+
+### La causa: `==` en vez de `===`
+En `ListaFacturas.jsx` la lógica de estados era correcta, pero la primera guarda usaba
+igualdad **débil** (`==`):
+
+```js
+if (facturas === undefined || config == undefined) return <p>Cargando…</p>  // ❌
+if (config === null) return <Navigate to="/configuracion" replace />
+```
+
+El hook `useConfig` distingue bien tres estados: `undefined` = cargando, `null` = cargó pero
+no hay config, objeto = hay config. El fallo es que **`null == undefined` es `true`** en JS
+(regla especial de la coerción del `==`). Así que con la config borrada (`config === null`),
+la línea del `Cargando…` lo capturaba y **nunca se llegaba** al `Navigate` → el redirect al
+onboarding era código muerto.
+
+### El arreglo
+Un solo carácter: `==` → `===`.
+
+```js
+if (facturas === undefined || config === undefined) return <p>Cargando…</p>  // ✅
+```
+
+Con `===`, `null === undefined` es `false`, así que un `config` en `null` ya no cae en
+"Cargando…" y pasa al `Navigate`.
+
+### Lección: `==` vs `===`
+- `===` (estricta): compara **valor y tipo**; si los tipos difieren, `false`. No convierte.
+- `==` (débil): **convierte** los tipos antes de comparar → sorpresas
+  (`1 == '1'`, `0 == false`, `'' == false`, `null == undefined`… todas `true`).
+- *Regla:* usar **siempre `===`/`!==`**. Única excepción idiomática y deliberada:
+  `x == null` para cubrir `null` **o** `undefined` a propósito.
+- *Pendiente:* revisar el `oxlint` para que avise de los `==` accidentales.
+
+---
+
 ## 2026-07-13 — Sincronización multi-dispositivo con Firebase (Fases 1-3)
 
 Mejora pedida por el titular del taller: poder usar la app en el **móvil y en el escritorio

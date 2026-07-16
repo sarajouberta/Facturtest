@@ -179,6 +179,33 @@ si se quiere, añadir uno o dos tests de componente por encima.
 - **Renderizado reactivo**: al cambiar un dato, la UI se repinta sola (totales en vivo,
   lista con `useLiveQuery`).
 
+### Recordatorio: ¿qué es un hook?
+
+Un **hook** es una función especial de React cuyo nombre empieza por `use`. Su superpoder
+es "enganchar" un componente a cosas que viven fuera de él y que **cambian con el tiempo**
+(estado, ciclo de vida, un contexto, una suscripción…). Cuando eso a lo que está enganchado
+cambia, React **vuelve a pintar** el componente solo. De ahí el nombre (*hook* = gancho).
+
+Los dos básicos:
+
+- **`useState`** → la memoria del componente. Guarda un valor y, al cambiarlo con su
+  `setX`, React repinta. Ej.: `const [facturas, setFacturas] = useState(undefined)`.
+- **`useEffect`** → ejecutar "efectos" que tocan el mundo exterior (suscribirse a Firebase,
+  un temporizador…) y **limpiarlos** después devolviendo una función de baja.
+
+Las **dos reglas** (el linter las vigila): (1) solo se llaman dentro de un componente o de
+otro hook; (2) solo en el nivel de arriba, nunca dentro de un `if`, un bucle o un `return`.
+La regla 2 es la razón de que las **acciones** de escritura (`crearFactura`, `borrarFactura`…)
+NO sean hooks: se llaman dentro de una función de evento (al pulsar un botón), donde no se
+puede usar `useAuth`; por eso leen el usuario con `auth.currentUser`.
+
+**Custom hooks (hooks propios):** puedes fabricar los tuyos combinando los de React, y se
+usan como uno más. En la Fase 4, `useFacturas()` junta por dentro `useAuth` + `useState` +
+`useEffect` (suscripción a Firestore con `onSnapshot`), y por fuera se usa en una línea:
+`const facturas = useFacturas()` → se repinta solo cuando cambian los datos, aquí o en otro
+dispositivo. La convención `use…` no es decoración: le dice a React y al linter que apliquen
+las reglas de arriba.
+
 ## Modelo de datos
 
 **Factura**
