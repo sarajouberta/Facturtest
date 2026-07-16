@@ -5,6 +5,7 @@ import { useFacturas, useConfig, crearFactura } from '../datos'
 
 import { generarSiguienteNumero } from '../utils/numeracion'
 import { nifValido, telefonoValido } from '../utils/validaciones'
+import { matriculaParaGuardar } from '../utils/matricula'
 import {
   calcularTotalMateriales,
   calcularBaseImponible,
@@ -74,7 +75,17 @@ function NuevaFactura() {
       return
     }
 
-    await crearFactura({ ...datos, totalMateriales, baseImponible, total })
+    // La matrícula se guarda normalizada (MAYÚSCULAS y pegada, p. ej. 1234ABC),
+    // así en la factura sale siempre uniforme, teclee como teclee.
+    const matricula = matriculaParaGuardar(datos.vehiculo?.matricula)
+
+    await crearFactura({
+      ...datos,
+      vehiculo: { ...datos.vehiculo, matricula },
+      totalMateriales,
+      baseImponible,
+      total,
+    })
 
     navigate('/')
   }
@@ -112,7 +123,7 @@ function NuevaFactura() {
             {errors.cliente?.nombre && (
               <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
             )}
-          <input className="border rounded px-3 py-2" placeholder="DNI / CIF"
+          <input className="border rounded px-3 py-2" placeholder="DNI / CIF (p. ej. 12345678Z)"
             {...register('cliente.nif', {
               required: 'El DNI del cliente es obligatorio',
               validate: (v) => nifValido(v) || 'DNI/CIF no válido',
@@ -126,7 +137,7 @@ function NuevaFactura() {
             {...register('cliente.localidad')} />
           <input className="border rounded px-3 py-2" placeholder="Provincia"
             {...register('cliente.provincia')} />
-          <input className="border rounded px-3 py-2" placeholder="Teléfono"
+          <input className="border rounded px-3 py-2" placeholder="Teléfono (p. ej. 600123456)"
             {...register('cliente.telefono', {
               validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
             })} />
@@ -148,7 +159,7 @@ function NuevaFactura() {
           {errors.vehiculo?.vehiculo && (
             <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
           )}
-          <input className="border rounded px-3 py-2" placeholder="Matrícula"
+          <input className="border rounded px-3 py-2" placeholder="Matrícula (p. ej. 1234 ABC)"
             {...register('vehiculo.matricula', { required: 'La matrícula es obligatoria' })} />
           {errors.vehiculo?.matricula && (
             <span className="text-red-600 text-sm">{errors.vehiculo.matricula.message}</span>

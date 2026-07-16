@@ -50,7 +50,8 @@ function Configuracion() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
         <span className="text-sm font-medium">Número inicial de factura</span>
-        <input type="number" min="1" className="border rounded px-3 py-2"
+        <input type="number" min="1" placeholder="p. ej. 1" className="border rounded px-3 py-2"
+          onFocus={(e) => e.target.select()}
           {...register('numeroInicial', {
             valueAsNumber: true,
             min: { value: 1, message: 'El número inicial debe ser 1 o mayor' },
@@ -74,7 +75,7 @@ function Configuracion() {
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">NIF</span>
-          <input className="border rounded px-3 py-2"
+          <input className="border rounded px-3 py-2" placeholder="p. ej. 12345678Z o B12345678"
             {...register('nif', {
               required: 'El NIF del taller es obligatorio',
               validate: (v) => nifValido(v) || 'NIF no válido',
@@ -86,18 +87,18 @@ function Configuracion() {
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Actividad</span>
-          <input className="border rounded px-3 py-2"
+          <input className="border rounded px-3 py-2" placeholder="p. ej. Reparación de vehículos"
             {...register('actividad')} />
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Dirección</span>
-          <input className="border rounded px-3 py-2"
+          <input className="border rounded px-3 py-2" placeholder="p. ej. C/ Mayor 12, 33001 Oviedo"
             {...register('direccion')} />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Teléfono</span>
-          <input className="border rounded px-3 py-2"
+          <input className="border rounded px-3 py-2" placeholder="p. ej. 985123456"
             {...register('telefono', {
               validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
             })} />
