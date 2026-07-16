@@ -1,6 +1,4 @@
 import { useParams, useNavigate } from 'react-router-dom'
-//import { useLiveQuery } from 'dexie-react-hooks'
-//import { db } from '../db'
 import { useFactura, useConfig, borrarFactura } from '../datos'
 
 import FacturaPDF from '../components/FacturaPDF'
@@ -16,18 +14,14 @@ function DetalleFactura() {
     //añadido para el pdf: hook que crea la "caja" que guarda referencia al elemento del DOM real
     const hojaRef = useRef(null)
 
-    //const factura = useLiveQuery(() => db.facturas.get(Number(id)), [id])
     const factura = useFactura(id)
 
-    //para mostrar temporalmente el detalle:
-    //const config = useLiveQuery(() => db.config.get(1))
     const config = useConfig()
 
     if (!factura) return <p>Cargando…</p>
 
     const eliminar = async () => {
         if (confirm(`¿Eliminar la factura ${factura.numero}?`)) {
-            //await db.facturas.delete(factura.id)
             await borrarFactura(factura.id)
             navigate('/')
         }

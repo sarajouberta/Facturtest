@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-//import { db } from '../db'
 import { useConfig, guardarConfig } from '../datos'
 
 import { useNavigate } from 'react-router-dom'
@@ -17,13 +16,6 @@ function Configuracion() {
   const [primeraVez, setPrimeraVez] = useState(false)
 
   //al abrir la pantalla, se cargan los datos guardados (si existen)
-  /* useEffect(() => {
-    db.config.get(1).then((config) => {
-      if (config) reset(config)
-      else setPrimeraVez(true)   // no hay datos == es la primera vez
-    })
-  }, [reset]) */
-
   const config = useConfig()
     useEffect(() => {
       if (config === undefined) return   // aún cargando, nada
@@ -35,8 +27,7 @@ function Configuracion() {
 
   //al pulsar "Guardar", se escribe en la base de datos
   const onSubmit = async (datos) => {
-    //await db.config.put({ ...datos, id: 1 })
-     await guardarConfig(datos)
+    await guardarConfig(datos)
 
     if (primeraVez) {
       navigate('/')            //primera vez: redirige a la pantalla principal

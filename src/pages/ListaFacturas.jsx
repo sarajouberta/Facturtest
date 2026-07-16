@@ -3,12 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { useFacturas, useConfig } from '../datos'
 
 function ListaFacturas() {
-  //useLiveQuery lee las facturas y se re-ejecuta solo cuando cambian en la BD
-  //const facturas = useLiveQuery(() => db.facturas.toArray())
-
   //null = cargado pero sin config;  undefined = todavía cargando
-  //const config = useLiveQuery(() => db.config.get(1).then((c) => c ?? null))
-
   const facturas = useFacturas()
   const config = useConfig()
 
@@ -64,14 +59,15 @@ export default ListaFacturas
 
 /* Notas sobre algunos cambios:
 - useParams(): lee los parámetros de la URL. Como la ruta es /factura/:id, si
-entras en /factura/3, useParams() te da { id: "3" }. Es la forma de saber qué
-factura mostrar.
-- db.facturas.get(Number(id)):  trae una factura por su clave. Ojo con
-Number(id): la URL siempre da texto ("3"), pero el id en Dexie es número (3),
-así que hay que convertirlo o no encontraría nada.
-- El segundo argumento [id] en useLiveQuery: le dice "vuelve a consultar si
-cambia el id". Es como las dependencias de useEffect.
-- db.facturas.delete(...): borra el registro. confirm(...) muestra el diálogo
-nativo de "¿seguro?" antes de eliminar.
-- Link to={\/factura/${f.id}`}`: genera el enlace a la factura concreta,
-metiendo su id en la URL */
+entras en /factura/abc123, useParams() te da { id: "abc123" }. Es la forma de
+saber qué factura mostrar.
+- En Firestore el id de cada factura es TEXTO (lo genera addDoc), así que se usa
+tal cual con useFactura(id), sin convertir a número (con Dexie sí había que
+hacer Number(id) porque allí el id era numérico).
+- Los datos se leen con hooks que se repintan solos (useFacturas, useFactura,
+useConfig): por dentro escuchan Firestore con onSnapshot y refrescan la vista
+sola cuando algo cambia, como hacía useLiveQuery con Dexie.
+- Borrar: borrarFactura(id) (deleteDoc). confirm(...) muestra el diálogo nativo
+de "¿seguro?" antes de eliminar.
+- Link to={`/factura/${f.id}`}: genera el enlace a la factura concreta,
+metiendo su id en la URL. */

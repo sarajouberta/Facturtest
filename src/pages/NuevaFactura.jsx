@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
-//import { db } from '../db'
 import { useFacturas, useConfig, crearFactura } from '../datos'
 
 import { generarSiguienteNumero } from '../utils/numeracion'
@@ -47,17 +46,10 @@ function NuevaFactura() {
   const baseImponible = calcularBaseImponible(totalMateriales, manoDeObra)
   const total = calcularTotal(baseImponible, iva)
 
-  //Al abrir la pantalla, se calcula el siguiente número correlativo
-  /* useEffect(() => {
-    //se lanzan las dos consultas a la vez y se espera el resul
-    Promise.all([db.facturas.toArray(), db.config.get(1)]).then(
-      //config?: se cubre error si no hay config guardada (x si acaso)
-      ([facturas, config]) => {
-        setValue('numero', generarSiguienteNumero(facturas, config?.numeroInicial))
-      }
-    )
-  }, [setValue])
- */
+  //Al abrir la pantalla se calcula el siguiente número correlativo.
+  //Los hooks (useFacturas/useConfig) se repintan solos cuando llegan los datos
+  //de Firestore, por eso esperamos a que ambos hayan cargado (undefined = aún
+  //cargando). config?: cubre el caso de que todavía no haya config guardada.
   const facturas = useFacturas()
     const config = useConfig()
     useEffect(() => {
@@ -82,7 +74,6 @@ function NuevaFactura() {
       return
     }
 
-    //await db.facturas.add({ ...datos, totalMateriales, baseImponible, total })
     await crearFactura({ ...datos, totalMateriales, baseImponible, total })
 
     navigate('/')
