@@ -5,6 +5,44 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-16 — Búsqueda y filtros de facturas + mejoras de formularios
+
+### Búsqueda y filtros (`ListaFacturas.jsx`)
+- Caja de texto que filtra **en vivo** por **nº de factura o matrícula** (se descartó
+  buscar por cliente: no hacía falta). Placeholder con ejemplo de formato.
+- Dos desplegables **Año** y **Mes** (con opción "todos"). El de Año se rellena solo con
+  los años presentes en las facturas. Los tres criterios se combinan con **Y**.
+  - *Por qué desplegables y no un selector de mes único:* se quería poder ver "todo un año"
+    o "un mes suelto" de forma independiente ("año **o** mes").
+
+### Matrícula normalizada
+- Al **guardar** una factura, la matrícula se limpia: **MAYÚSCULAS y sin espacios ni
+  guiones** (`1234 abc` → `1234ABC`), así en la factura sale siempre uniforme.
+- Al **buscar**, se compara con la misma limpieza, de modo que da igual espacios, guiones o
+  mayúsculas. Es **agnóstico al formato**: vale para matrículas nuevas (`1234 BCD`) y
+  antiguas (`M-1234-AB`), porque no valida el patrón, solo quita separadores.
+
+### Lógica extraída a `src/utils/` (para poder testear)
+- `matricula.js`: `matriculaParaGuardar` y `normalizarMatricula`.
+- `busqueda.js`: `filtrarFacturas(facturas, { texto, anio, mes })` (función pura).
+  - *Por qué:* la lógica estaba dentro del componente y no se podía testear; sacarla la hace
+    testeable y reutilizable, siguiendo el patrón de los demás `utils`.
+
+### Usabilidad de los formularios
+- **Placeholders con ejemplo de formato** en los campos donde el formato importa: matrícula,
+  DNI/CIF y teléfono (factura), y nº inicial, NIF, actividad, dirección y teléfono
+  (configuración). Se dejaron sin ejemplo "nombre comercial" y "titular" (texto libre).
+- El campo **"Número inicial de factura"** ahora **se selecciona al enfocarlo**
+  (`onFocus`), igual que los importes de la factura: al teclear se reemplaza el valor sin
+  borrarlo a mano.
+
+### Tests
+- Nuevos `matricula.test.js` y `busqueda.test.js`. Uno documenta a propósito por qué un
+  dígito corto como "1" saca varias facturas (coincide con el número **y/o** la matrícula):
+  es comportamiento esperado, no un fallo. El proyecto pasa a **42 tests en verde**.
+
+---
+
 ## 2026-07-16 — Bug: "Cargando…" eterno tras el login sin config
 
 Al entrar con Google **habiendo borrado la config del taller**, la app se quedaba clavada en
