@@ -1,7 +1,9 @@
 import { useEffect } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
-import { db } from '../db'
+//import { db } from '../db'
+import { useFacturas, useConfig, crearFactura } from '../datos'
+
 import { generarSiguienteNumero } from '../utils/numeracion'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import {
@@ -46,7 +48,7 @@ function NuevaFactura() {
   const total = calcularTotal(baseImponible, iva)
 
   //Al abrir la pantalla, se calcula el siguiente número correlativo
-  useEffect(() => {
+  /* useEffect(() => {
     //se lanzan las dos consultas a la vez y se espera el resul
     Promise.all([db.facturas.toArray(), db.config.get(1)]).then(
       //config?: se cubre error si no hay config guardada (x si acaso)
@@ -55,6 +57,13 @@ function NuevaFactura() {
       }
     )
   }, [setValue])
+ */
+  const facturas = useFacturas()
+    const config = useConfig()
+    useEffect(() => {
+      if (facturas === undefined || config === undefined) return   // esperamos a que carguen
+      setValue('numero', generarSiguienteNumero(facturas, config?.numeroInicial))
+    }, [facturas, config, setValue])
 
   const onSubmit = async (datos) => {
     // Recalculamos y "congelamos" los importes al guardar
@@ -73,7 +82,9 @@ function NuevaFactura() {
       return
     }
 
-    await db.facturas.add({ ...datos, totalMateriales, baseImponible, total })
+    //await db.facturas.add({ ...datos, totalMateriales, baseImponible, total })
+    await crearFactura({ ...datos, totalMateriales, baseImponible, total })
+
     navigate('/')
   }
 

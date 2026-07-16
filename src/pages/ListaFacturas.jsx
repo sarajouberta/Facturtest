@@ -1,16 +1,20 @@
-import { useLiveQuery } from 'dexie-react-hooks'
+//Nota: cambios para cambiar la bdd Firebase
 import { Link, Navigate } from 'react-router-dom'
-import { db } from '../db'
+import { useFacturas, useConfig } from '../datos'
 
 function ListaFacturas() {
   //useLiveQuery lee las facturas y se re-ejecuta solo cuando cambian en la BD
-  const facturas = useLiveQuery(() => db.facturas.toArray())
+  //const facturas = useLiveQuery(() => db.facturas.toArray())
 
   //null = cargado pero sin config;  undefined = todavía cargando
-  const config = useLiveQuery(() => db.config.get(1).then((c) => c ?? null))
+  //const config = useLiveQuery(() => db.config.get(1).then((c) => c ?? null))
+
+  const facturas = useFacturas()
+  const config = useConfig()
+
 
   // aún cargando datos de la BD
-  if (facturas === undefined || config== undefined) return <p>Cargando…</p>
+  if (facturas === undefined || config === undefined) return <p>Cargando…</p>
 
   // no hay datos del taller todavía → llevar a Configuración (onboarding)
   if (config === null) return <Navigate to="/configuracion" replace />

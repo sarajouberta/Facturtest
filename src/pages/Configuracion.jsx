@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { db } from '../db'
+//import { db } from '../db'
+import { useConfig, guardarConfig } from '../datos'
+
 import { useNavigate } from 'react-router-dom'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 
@@ -15,21 +17,31 @@ function Configuracion() {
   const [primeraVez, setPrimeraVez] = useState(false)
 
   //al abrir la pantalla, se cargan los datos guardados (si existen)
-  useEffect(() => {
+  /* useEffect(() => {
     db.config.get(1).then((config) => {
       if (config) reset(config)
       else setPrimeraVez(true)   // no hay datos == es la primera vez
     })
-  }, [reset])
+  }, [reset]) */
+
+  const config = useConfig()
+    useEffect(() => {
+      if (config === undefined) return   // aún cargando, nada
+      if (config) reset(config)          // hay datos: rellenamos el formulario
+      else setPrimeraVez(true)           // null: es la primera vez
+    }, [config, reset])
+
 
 
   //al pulsar "Guardar", se escribe en la base de datos
   const onSubmit = async (datos) => {
-    await db.config.put({ ...datos, id: 1 })
+    //await db.config.put({ ...datos, id: 1 })
+     await guardarConfig(datos)
+
     if (primeraVez) {
-      navigate('/')            // primera vez: redirige a la pantalla principal
+      navigate('/')            //primera vez: redirige a la pantalla principal
     } else {
-      alert('Datos del taller guardados')   // editando: confirmamos y nos quedamos
+      alert('Datos del taller guardados')   //editando: confirmamos y nos quedamos
     }
   }
 

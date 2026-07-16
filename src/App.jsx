@@ -21,27 +21,33 @@ function App() {
           <Link to="/configuracion">Configuración</Link>
         </nav>
 
-        {!cargando && (
-          usuario ? (
-            <div className="flex items-center gap-2 text-sm">
-              <span>{usuario.displayName || usuario.email}</span>
-              <button onClick={salir} className="text-blue-600 underline">Salir</button>
-            </div>
-          ) : (
-            <button onClick={entrar} className="bg-blue-600 text-white rounded px-3 py-1 text-sm">
-              Entrar con Google
-            </button>
-          )
+        {!cargando && usuario && (
+          <div className="flex items-center gap-2 text-sm">
+            <span>{usuario.displayName || usuario.email}</span>
+            <button onClick={salir} className="text-blue-600 underline">Salir</button>
+          </div>
         )}
+
       </header>
 
       <main>
-        <Routes>
-          <Route path="/" element={<ListaFacturas />} />
-          <Route path="/nueva-factura" element={<NuevaFactura />}/>
-          <Route path="/factura/:id" element={<DetalleFactura />} />
-          <Route path="/configuracion" element={<Configuracion/>} />
-        </Routes>
+        {cargando ? (
+          <p>Cargando…</p>
+        ) : !usuario ? (
+          <div className="flex flex-col items-center gap-3 mt-10">
+            <p>Inicia sesión para acceder a tus facturas.</p>
+            <button onClick={entrar} className="bg-blue-600 text-white rounded px-4 py-2">
+              Entrar con Google
+            </button>
+          </div>
+        ) : (
+          <Routes>
+            <Route path="/" element={<ListaFacturas />} />
+            <Route path="/nueva-factura" element={<NuevaFactura />} />
+            <Route path="/factura/:id" element={<DetalleFactura />} />
+            <Route path="/configuracion" element={<Configuracion />} />
+          </Routes>
+        )}
       </main>
     </div>
   )

@@ -1,7 +1,11 @@
-//Inicialización de Firebase para toda la app (se ejecuta una sola vez).
+//Inicialización de Firebase para toda la app (se ejecuta una sola vez): cambio para que funcione offline
 import { initializeApp } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+//import { getFirestore } from 'firebase/firestore'
+//persistencia local: initializeFirestore es como getFirestore pero admite arg. con la config.
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  } from 'firebase/firestore'
+
 
 /*Las claves vienen de variables de entorno (.env.local). Vite solo expone al
 navegador las que empiezan por VITE_. No son secretas (viajan en cualquier app
@@ -17,7 +21,14 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 
-// Servicios que usaremos en el resto de la app:
-export const auth = getAuth(app)            // login (Fase 3)
+//Servicios que usaremos en el resto de la app:
+export const auth = getAuth(app)            // login
 export const googleProvider = new GoogleAuthProvider()
-export const firestore = getFirestore(app)  // base de datos en la nube (Fase 4)
+//Firestore con caché local: funciona offline y sincroniza solo al recuperar red
+  export const firestore = initializeFirestore(app, {
+    //"guarda copia en disco": indexedDB como Dexie, que sobrevive al cerrar la app
+    localCache: persistentLocalCache({
+      //si se abriera + de 1 pestaña, usan la misma copia local sin pelearse
+      tabManager: persistentMultipleTabManager(),
+    }),
+  })
