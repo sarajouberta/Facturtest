@@ -5,6 +5,26 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-17 — Manejo de errores (evitar pantallas en blanco)
+
+Raíz del susto: la app **publicada** salió en blanco porque faltaban las claves de Firebase
+en Vercel (`.env.local` no se sube a git). Se solucionó añadiéndolas en Vercel (Environment
+Variables, Production) + redeploy + limpiar el caché de la PWA. Para que un fallo así no vuelva
+a dejar una pantalla muda, se añaden **redes de seguridad**:
+
+- **Error Boundary** (`src/components/ErrorBoundary.jsx`): captura errores AL RENDERIZAR y
+  muestra "Algo ha ido mal" con botón de recargar, en vez de un blanco. Es un componente de
+  **clase** (React solo permite capturar errores de render con `getDerivedStateFromError` /
+  `componentDidCatch`, no hay equivalente con hooks). Envuelve la app en `main.jsx`.
+- **Mensaje de respaldo en `index.html`**: cubre los fallos **al arrancar** (imports que
+  petan, como el de hoy), que el Error Boundary NO ve porque React aún no se ha montado. Es
+  HTML con estilos en línea dentro de `#root`; React lo reemplaza al montar.
+- **Avisos al guardar/borrar** (`NuevaFactura`, `DetalleFactura`, `Configuracion`):
+  `crearFactura`, `borrarFactura` y `guardarConfig` van en `try/catch` con un `alert` claro;
+  antes el error solo se escribía en consola y el usuario no se enteraba.
+
+---
+
 ## 2026-07-17 — Cliente/vehículo recurrente y afinado de búsqueda y formulario
 
 ### Cliente recurrente (por matrícula)
