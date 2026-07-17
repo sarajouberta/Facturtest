@@ -38,7 +38,8 @@ function Configuracion() {
 
   return (
     <div className="max-w-md">
-      <h2 className="text-xl font-bold mb-4">Configuración del taller</h2>
+      <h2 className="text-xl font-bold mb-1">Configuración del taller</h2>
+      <p className="text-sm text-gray-500 mb-4">Los campos con * son obligatorios.</p>
 
       {primeraVez && (
         <p className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 mb-4 text-sm">
@@ -74,7 +75,7 @@ function Configuracion() {
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">NIF</span>
+          <span className="text-sm font-medium">NIF *</span>
           <input className="border rounded px-3 py-2" placeholder="p. ej. 12345678Z o B12345678"
             {...register('nif', {
               required: 'El NIF del taller es obligatorio',

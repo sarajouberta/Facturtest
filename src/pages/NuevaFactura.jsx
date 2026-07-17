@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { useFacturas, useConfig, crearFactura } from '../datos'
@@ -6,6 +6,7 @@ import { useFacturas, useConfig, crearFactura } from '../datos'
 import { generarSiguienteNumero } from '../utils/numeracion'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import { matriculaParaGuardar } from '../utils/matricula'
+import { buscarPorMatricula } from '../utils/busqueda'
 import {
   calcularTotalMateriales,
   calcularBaseImponible,
@@ -37,6 +38,7 @@ function NuevaFactura() {
     control, name: 'conceptos'
   })
   const navigate = useNavigate()
+  const [vehiculoRecurrente, setVehiculoRecurrente] = useState(null)
 
   // Valores observados en vivo para calcular los totales
   const conceptos = watch('conceptos')
@@ -57,6 +59,26 @@ function NuevaFactura() {
       if (facturas === undefined || config === undefined) return   // esperamos a que carguen
       setValue('numero', generarSiguienteNumero(facturas, config?.numeroInicial))
     }, [facturas, config, setValue])
+
+  // register de la matrícula en una variable para poder encadenar su onBlur
+  // (validación de RHF) con nuestra búsqueda de vehículo recurrente.
+  const matriculaReg = register('vehiculo.matricula', { required: 'La matrícula es obligatoria' })
+
+  // Al salir del campo matrícula, buscamos si ese vehículo ya existe en facturas
+  // anteriores, para ofrecer rellenar sus datos (cliente recurrente).
+  const buscarVehiculo = (matricula) => {
+    setVehiculoRecurrente(buscarPorMatricula(facturas ?? [], matricula))
+  }
+
+  // Rellena cliente y marca/modelo con los de la factura encontrada. No tocamos
+  // la matrícula (ya está) ni los km (cambian en cada visita).
+  const rellenarVehiculoRecurrente = () => {
+    if (!vehiculoRecurrente) return
+    setValue('cliente', vehiculoRecurrente.cliente)
+    setValue('vehiculo.vehiculo', vehiculoRecurrente.vehiculo?.vehiculo ?? '')
+    setValue('vehiculo.modelo', vehiculoRecurrente.vehiculo?.modelo ?? '')
+    setVehiculoRecurrente(null)
+  }
 
   const onSubmit = async (datos) => {
     // Recalculamos y "congelamos" los importes al guardar
@@ -92,7 +114,8 @@ function NuevaFactura() {
 
   return (
     <div className="max-w-2xl">
-      <h2 className="text-xl font-bold mb-4">Nueva factura</h2>
+      <h2 className="text-xl font-bold mb-1">Nueva factura</h2>
+      <p className="text-sm text-gray-500 mb-4">Los campos con * son obligatorios.</p>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
 
@@ -100,7 +123,7 @@ function NuevaFactura() {
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Factura</legend>
           <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Número</span>
+            <span className="text-sm font-medium">Número *</span>
             <input type="number" min="1" className="border rounded px-3 py-2"
               {...register('numero', { required: 'El número es obligatorio' })}
             />
@@ -115,15 +138,50 @@ function NuevaFactura() {
           </label>
         </fieldset>
 
+        {/* Datos del vehículo — primero, porque la matrícula reconoce al cliente */}
+        <fieldset className="flex flex-col gap-3 border rounded p-4">
+          <legend className="font-semibold px-1">Vehículo</legend>
+          <input className="border rounded px-3 py-2" placeholder="Matrícula * (p. ej. 1234 ABC)"
+            {...matriculaReg}
+            onBlur={(e) => { matriculaReg.onBlur(e); buscarVehiculo(e.target.value) }} />
+          {errors.vehiculo?.matricula && (
+            <span className="text-red-600 text-sm">{errors.vehiculo.matricula.message}</span>
+          )}
+          {vehiculoRecurrente && (
+            <div className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 text-sm flex items-center justify-between gap-2">
+              <span>🚗 Este vehículo ya está: <strong>{vehiculoRecurrente.cliente?.nombre}</strong>. ¿Rellenar sus datos?</span>
+              <button
+                type="button"
+                onClick={rellenarVehiculoRecurrente}
+                className="bg-blue-600 text-white rounded px-3 py-1 font-medium shrink-0"
+              >
+                Rellenar
+              </button>
+            </div>
+          )}
+          <input className="border rounded px-3 py-2" placeholder="Modelo *"
+            {...register('vehiculo.modelo', { required: 'El modelo es obligatorio' })} />
+          {errors.vehiculo?.modelo && (
+            <span className="text-red-600 text-sm">{errors.vehiculo.modelo.message}</span>
+          )}
+          <input className="border rounded px-3 py-2" placeholder="Marca *"
+            {...register('vehiculo.vehiculo', { required: 'La marca es obligatoria' })} />
+          {errors.vehiculo?.vehiculo && (
+            <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
+          )}
+          <input className="border rounded px-3 py-2" placeholder="Km"
+            {...register('vehiculo.km')} />
+        </fieldset>
+
         {/* Datos del cliente */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Cliente</legend>
-          <input className="border rounded px-3 py-2" placeholder="Nombre"
+          <input className="border rounded px-3 py-2" placeholder="Nombre *"
             {...register('cliente.nombre',{ required: 'El nombre del cliente es obligatorio' })} />
             {errors.cliente?.nombre && (
               <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
             )}
-          <input className="border rounded px-3 py-2" placeholder="DNI / CIF (p. ej. 12345678Z)"
+          <input className="border rounded px-3 py-2" placeholder="DNI / CIF * (p. ej. 12345678Z)"
             {...register('cliente.nif', {
               required: 'El DNI del cliente es obligatorio',
               validate: (v) => nifValido(v) || 'DNI/CIF no válido',
@@ -144,28 +202,6 @@ function NuevaFactura() {
             {errors.cliente?.telefono && (
               <span className="text-red-600 text-sm">{errors.cliente.telefono.message}</span>
             )}
-        </fieldset>
-
-        {/* Datos del vehículo */}
-        <fieldset className="flex flex-col gap-3 border rounded p-4">
-          <legend className="font-semibold px-1">Vehículo</legend>
-          <input className="border rounded px-3 py-2" placeholder="Modelo"
-            {...register('vehiculo.modelo', { required: 'El modelo es obligatorio' })} />
-          {errors.vehiculo?.modelo && (
-            <span className="text-red-600 text-sm">{errors.vehiculo.modelo.message}</span>
-          )}
-          <input className="border rounded px-3 py-2" placeholder="Vehículo"
-            {...register('vehiculo.vehiculo', { required: 'El vehículo (marca) es obligatorio' })} />
-          {errors.vehiculo?.vehiculo && (
-            <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
-          )}
-          <input className="border rounded px-3 py-2" placeholder="Matrícula (p. ej. 1234 ABC)"
-            {...register('vehiculo.matricula', { required: 'La matrícula es obligatoria' })} />
-          {errors.vehiculo?.matricula && (
-            <span className="text-red-600 text-sm">{errors.vehiculo.matricula.message}</span>
-          )}
-          <input className="border rounded px-3 py-2" placeholder="Km"
-            {...register('vehiculo.km')} />
         </fieldset>
 
         {/* Trabajos realizados */}

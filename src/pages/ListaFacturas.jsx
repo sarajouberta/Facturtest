@@ -52,7 +52,7 @@ function ListaFacturas() {
             type="search"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            placeholder="Buscar por nº de factura o matrícula (p. ej. 1234 ABC)"
+            placeholder="Buscar por matrícula (p. ej. 1234 ABC)"
             className="w-full border rounded px-3 py-2"
           />
           <div className="flex gap-2">
@@ -95,7 +95,7 @@ function ListaFacturas() {
                 <div>
                   <div className="font-medium">{f.numero}</div>
                   <div className="text-sm text-gray-600">
-                    {f.cliente?.nombre} · {f.fecha}
+                    {f.cliente?.nombre} · {f.vehiculo?.matricula} · {f.fecha}
                   </div>
                 </div>
                 <div className="font-bold">{f.total.toFixed(2)} €</div>
