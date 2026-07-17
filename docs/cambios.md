@@ -5,6 +5,36 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-17 — Cliente/vehículo recurrente y afinado de búsqueda y formulario
+
+### Cliente recurrente (por matrícula)
+- En "Nueva factura", al salir del campo **matrícula** (`onBlur`), se busca si ese vehículo
+  ya existe en facturas anteriores. Si lo hay, aparece un aviso *"🚗 Este vehículo ya está:
+  [cliente]. ¿Rellenar sus datos?"* con un botón que **autocompleta cliente + marca/modelo**
+  (no la matrícula ni los km, que cambian).
+  - *Por qué la matrícula como clave:* es el identificador único del coche, sin las erratas
+    ni duplicados de un nombre. Se coge la factura **más reciente** por si el coche cambió de
+    dueño (con `buscarPorMatricula`, función pura en `utils/busqueda.js`, con tests).
+  - *Detalle técnico:* el `onBlur` del `register` de RHF se **encadena** con nuestra búsqueda
+    (se llama a los dos) para no pisar la validación. El botón es `type="button"` para no
+    enviar el formulario.
+
+### La búsqueda pasa a ser SOLO por matrícula
+- Antes la caja buscaba en nº de factura **y** matrícula, lo que solapaba resultados con datos
+  cortos (buscar "1" sacaba facturas por su **número**, no por la matrícula). Se quita el
+  número de la búsqueda: la caja busca **solo matrícula**, que es lo que de verdad se usa.
+- La **lista muestra ahora la matrícula** en cada línea (`cliente · matrícula · fecha`), para
+  que se vea por qué una factura coincide.
+
+### Orden y etiquetas del formulario
+- El bloque **Vehículo** se sube **encima de Cliente**, y dentro la **matrícula va primero**:
+  así el flujo es número → fecha → matrícula → (reconoce el coche) → se rellena lo de abajo.
+- El campo "Vehículo" pasa a llamarse **"Marca"** (que es lo que era).
+- **Campos obligatorios marcados con `*`** (factura y configuración) + nota "Los campos con *
+  son obligatorios".
+
+---
+
 ## 2026-07-16 — Búsqueda y filtros de facturas + mejoras de formularios
 
 ### Búsqueda y filtros (`ListaFacturas.jsx`)
