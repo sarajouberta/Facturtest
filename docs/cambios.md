@@ -258,7 +258,13 @@ guardado** y marca en rojo el campo cuando algo falla.
     que haces `push`; GitHub enlaza cada commit a un perfil **por ese email**.
 
 ### Pendiente / cola de mejoras
-- Backup / exportar-importar datos (los datos solo viven en el móvil).
-- Editar factura, buscar y ordenar la lista, clientes recurrentes.
+- **Editar factura** (hoy no se puede modificar una vez creada).
+- **Exportar / importar datos** — en concreto, definir **cómo se gestiona la exportación
+  cuando se use en escritorio** (qué formato, dónde se guardan los archivos, etc.). Con
+  Firebase los datos ya sincronizan, pero falta el flujo de exportación/backup manual.
+- Ordenar la lista de facturas.
+- Testeo de componentes (React Testing Library) para la interfaz.
 - Subir el NIF a "nivel B" (validar el dígito de control).
 - Pasada de diseño con la identidad roja de ASTURTEST.
+
+(Ya hechos de esta lista: búsqueda por matrícula, filtros por año/mes, cliente recurrente.)
