@@ -101,15 +101,19 @@ function NuevaFactura() {
     // así en la factura sale siempre uniforme, teclee como teclee.
     const matricula = matriculaParaGuardar(datos.vehiculo?.matricula)
 
-    await crearFactura({
-      ...datos,
-      vehiculo: { ...datos.vehiculo, matricula },
-      totalMateriales,
-      baseImponible,
-      total,
-    })
-
-    navigate('/')
+    try {
+      await crearFactura({
+        ...datos,
+        vehiculo: { ...datos.vehiculo, matricula },
+        totalMateriales,
+        baseImponible,
+        total,
+      })
+      navigate('/')
+    } catch (error) {
+      console.error('❌ Error al guardar la factura:', error)
+      alert('No se pudo guardar la factura. Revisa la conexión e inténtalo de nuevo.')
+    }
   }
 
   return (

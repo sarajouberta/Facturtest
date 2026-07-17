@@ -22,8 +22,13 @@ function DetalleFactura() {
 
     const eliminar = async () => {
         if (confirm(`¿Eliminar la factura ${factura.numero}?`)) {
-            await borrarFactura(factura.id)
-            navigate('/')
+            try {
+                await borrarFactura(factura.id)
+                navigate('/')
+            } catch (error) {
+                console.error('❌ Error al eliminar la factura:', error)
+                alert('No se pudo eliminar la factura. Revisa la conexión e inténtalo de nuevo.')
+            }
         }
     }
 

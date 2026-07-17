@@ -7,7 +7,15 @@
     <title>facturtest</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Mensaje de respaldo: si la app no llega a arrancar (p. ej. un fallo de
+           carga), esto se queda visible en vez de una pantalla en blanco. React
+           lo reemplaza al montar. Estilos en línea porque aún no cargó el CSS. -->
+      <div style="max-width:28rem;margin:3rem auto;padding:0 1rem;text-align:center;font-family:system-ui,sans-serif;color:#4b5563">
+        <p>Cargando Facturtest…</p>
+        <p style="font-size:.875rem">Si esta pantalla no desaparece, recarga la página o cierra y vuelve a abrir la app.</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

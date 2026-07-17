@@ -27,7 +27,13 @@ function Configuracion() {
 
   //al pulsar "Guardar", se escribe en la base de datos
   const onSubmit = async (datos) => {
-    await guardarConfig(datos)
+    try {
+      await guardarConfig(datos)
+    } catch (error) {
+      console.error('❌ Error al guardar la configuración:', error)
+      alert('No se pudieron guardar los datos. Revisa la conexión e inténtalo de nuevo.')
+      return
+    }
 
     if (primeraVez) {
       navigate('/')            //primera vez: redirige a la pantalla principal
