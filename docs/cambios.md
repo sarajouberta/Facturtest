@@ -5,6 +5,34 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-07-27 — Login con Google roto en el móvil (PWA)
+
+Síntoma: en el móvil, al pulsar **"Entrar con Google"** no pasaba **nada**. La app está
+instalada como **PWA en modo `standalone`** (`vite.config.js`), y en ese modo el navegador
+**no deja abrir el popup** de `signInWithPopup`: la promesa se rechaza. Como el botón llamaba
+a `entrar` **sin `.catch`** (`onClick={entrar}` con `entrar = () => signInWithPopup(...)`), el
+error se perdía como *rejection* no capturada y el usuario no veía nada.
+
+### El arreglo (`src/auth/AuthContext.jsx`)
+- **PWA / standalone → `signInWithRedirect`.** Se detecta el modo con
+  `matchMedia('(display-mode: standalone)')` (Android/escritorio) y `navigator.standalone`
+  (iOS). En standalone se va directo a **redirección de página completa**, que sí funciona.
+- **Navegador → sigue con popup**, pero con **respaldo**: si el popup está bloqueado o no se
+  soporta (`auth/popup-blocked`, `auth/cancelled-popup-request`,
+  `auth/operation-not-supported-in-this-environment`), **cae automáticamente a redirección**.
+  Si el usuario cierra el popup a propósito (`auth/popup-closed-by-user`), no se molesta.
+- **`getRedirectResult(auth)` al arrancar** (en el `useEffect`): recoge el resultado al volver
+  de Google y, sobre todo, **avisa con un `alert`** si algo falla, en vez de quedarse mudo.
+- `entrar` pasa a ser **`async`** con su propio `try/catch`, así el `onClick` ya no deja
+  *rejections* sueltas.
+
+### Pendiente de verificar al desplegar
+- El **dominio de Vercel** debe estar en **Firebase → Authentication → Authorized domains**,
+  o la redirección volverá con error (ahora al menos se ve el `alert`).
+- La redirección solo se puede probar en el **móvil real** tras el redeploy (no en local).
+
+---
+
 ## 2026-07-17 — Manejo de errores (evitar pantallas en blanco)
 
 Raíz del susto: la app **publicada** salió en blanco porque faltaban las claves de Firebase
