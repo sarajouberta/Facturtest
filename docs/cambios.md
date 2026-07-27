@@ -26,9 +26,26 @@ error se perdía como *rejection* no capturada y el usuario no veía nada.
 - `entrar` pasa a ser **`async`** con su propio `try/catch`, así el `onClick` ya no deja
   *rejections* sueltas.
 
+### Segunda parte: la redirección volvía SIN sesión (cookies de terceros)
+Tras el arreglo anterior, en el móvil ya salía el selector de cuenta de Google, pero al
+volver **no quedaba logueado**: te devolvía al mismo punto. Causa: el **particionado de
+almacenamiento / bloqueo de cookies de terceros** de los navegadores modernos (Chrome 115+,
+Safari/iOS). La credencial se guarda contra el dominio `firebaseapp.com` en un contexto
+particionado, así que `getRedirectResult` no la recupera.
+
+Solución oficial de Firebase (*redirect best practices*): **servir el manejador de login
+desde el propio dominio** para que no haya cookies de terceros.
+- **Proxy en `vercel.json`:** `/__/auth/:path*` se reenvía a
+  `https://facturtest-6b96e.firebaseapp.com/__/auth/:path*`. Para el navegador todo ocurre en
+  `facturtest.vercel.app`; Vercel hace de intermediario por detrás.
+- **`authDomain` pasa a `facturtest.vercel.app`** (el dominio propio) en la variable de
+  entorno **`VITE_FIREBASE_AUTH_DOMAIN` de Vercel (Production)**. En **local** se deja
+  `facturtest-6b96e.firebaseapp.com` (`.env.local`), donde el popup funciona en el navegador
+  de escritorio; el proxy solo hace falta en producción.
+
 ### Pendiente de verificar al desplegar
-- El **dominio de Vercel** debe estar en **Firebase → Authentication → Authorized domains**,
-  o la redirección volverá con error (ahora al menos se ve el `alert`).
+- El **dominio de Vercel** debe estar en **Firebase → Authentication → Authorized domains**
+  (hecho).
 - La redirección solo se puede probar en el **móvil real** tras el redeploy (no en local).
 
 ---
