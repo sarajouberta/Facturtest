@@ -14,7 +14,7 @@ sirve cada una. App de facturación (PWA) para el taller mecánico.
 ### ¿Qué es Vite exactamente?
 
 Vite (francés, "rápido") NO es una librería que se ejecute dentro de la app (como React o
-Dexie), sino una **herramienta de desarrollo y construcción**. Hace dos trabajos:
+Firebase), sino una **herramienta de desarrollo y construcción**. Hace dos trabajos:
 
 1. **Servidor de desarrollo** (`npm run dev`): sirve la app en `localhost:5173` con
    arranque instantáneo y **hot reload** (al guardar, el navegador se actualiza solo sin
@@ -46,8 +46,9 @@ Comandos (en `package.json`): `npm run dev` (desarrollo), `npm run build` (produ
 
 | Tecnología | Para qué | Dónde se usa |
 |---|---|---|
-| **Dexie.js** | Base de datos local (IndexedDB) en el dispositivo, sin servidor. `db.facturas.add()`, `db.config.put/get()`. | `db.js`, pantallas |
-| **dexie-react-hooks** (`useLiveQuery`) | Las pantallas se actualizan solas al cambiar los datos. | Lista de facturas |
+| **Cloud Firestore** (`firebase/firestore`) | Base de datos en la nube, sincronizada entre dispositivos y con copia local para trabajar sin internet. `addDoc()`, `setDoc()`, `deleteDoc()`, `onSnapshot()`. | `datos.js` (toda la app pasa por ahí) |
+| **Firebase Auth** (`firebase/auth`) | Login con Google. Da el `uid` del que cuelgan todos los datos. | `firebase.js`, `auth/AuthContext.jsx` |
+| **Hooks propios** (`useFacturas`, `useFactura`, `useConfig`) | Las pantallas se actualizan solas al cambiar los datos: envuelven `onSnapshot` en `useState` + `useEffect`. | `datos.js` |
 | **React Hook Form** | Gestión de formularios. Piezas: `useForm`, `register`, `handleSubmit`, `watch`, `setValue`, y `useFieldArray` para líneas dinámicas. | `NuevaFactura.jsx`, `Configuracion.jsx` |
 
 ## Generación de PDF
@@ -263,7 +264,7 @@ si se quiere, añadir uno o dos tests de componente por encima.
 - **Ámbito (scope)**: las funciones que usan datos del componente deben estar DENTRO de
   la función del componente; fuera, esas variables no existen.
 - **Renderizado reactivo**: al cambiar un dato, la UI se repinta sola (totales en vivo,
-  lista con `useLiveQuery`).
+  lista con los hooks propios de `datos.js`, que escuchan Firestore con `onSnapshot`).
 
 ### Recordatorio: ¿qué es un hook?
 
@@ -322,40 +323,101 @@ Decisiones de diseño:
 - Modelo ampliado tras analizar la factura de papel real del taller (vehículo, mano de
   obra separada, cliente completo, trabajos realizados).
 
-## Arquitectura de datos: base de datos por dispositivo
+## Arquitectura de datos: una rama por usuario, en la nube
 
-Facturtest **no tiene servidor ni base de datos central**. Cada dispositivo guarda los
-datos **dentro de su propio navegador**, en **IndexedDB** (la BD integrada en todos los
-navegadores), a la que se accede mediante Dexie.js.
+> **Histórico:** hasta el 16/07/2026 los datos vivían **solo en el dispositivo** (IndexedDB vía
+> Dexie), sin servidor. Eso daba coste cero y privacidad total, pero cada dispositivo tenía su
+> propia base aislada: las facturas del móvil no existían en el PC y la configuración del taller
+> había que rellenarla en cada sitio. Se migró a **Firestore** para tener sincronización real
+> entre dispositivos. Ver `cambios.md`.
 
-Comparación:
+Hoy los datos viven en **Cloud Firestore** (base de datos de documentos, en la nube), y todo
+cuelga del usuario que ha iniciado sesión:
 
 ```
-App clásica (con servidor):
-  varios dispositivos ──► SERVIDOR ──► una BD central (datos compartidos)
-
-Facturtest (sin servidor):
-  móvil del padre ──► su propia BD (en el móvil)
-  PC de Sara      ──► su propia BD (en el navegador)
+users/{uid}/facturas/{idFactura}     ← una factura por documento
+users/{uid}/config/taller            ← documento único con los datos del taller
 ```
 
-**Consecuencias** (cada BD es independiente y aislada):
-- Las facturas creadas en un dispositivo solo existen en ese dispositivo.
-- La **Configuración del taller** hay que rellenarla en cada dispositivo (si no, el PDF
-  sale con la cabecera vacía).
-- No hay sincronización entre dispositivos; incluso Chrome y Firefox del mismo equipo
-  tienen bases de datos separadas.
+```
+Facturtest (con Firestore):
+  móvil del padre ──┐
+                    ├──► users/{uid}/…  (la MISMA rama, sincronizada)
+  PC de Sara      ──┘
+```
 
-**Por qué se eligió así** (adecuado para el caso: un taller, un móvil, una persona):
-- Cero coste (sin servidor que pagar/mantener).
-- Funciona **sin internet** (los datos están en el propio dispositivo → habilita la PWA offline).
-- Privacidad total (los datos no salen del dispositivo).
-- Simplicidad (sin backend, login ni seguridad de red).
+**Consecuencias:**
+- Los dispositivos que entran **con la misma cuenta de Google** comparten datos y se
+  sincronizan solos: `onSnapshot` repinta las pantallas en cuanto algo cambia.
+- La configuración del taller se rellena **una vez**, no en cada dispositivo.
+- El `uid` no es un dato más de la factura, es **parte de la ruta**. Eso es lo que permite que
+  las reglas de seguridad sean una sola línea (ver abajo).
 
-**Si en el futuro se quisiera compartir entre dispositivos / copia en la nube**: haría
-falta un backend (Node/Express, Spring…) con una BD central (PostgreSQL, MongoDB…) y que
-la app hablara con él por internet. Añade complejidad; para el MVP no era necesario.
-Alternativa intermedia y sencilla: exportar/importar las facturas a un archivo (backup).
+**Sigue funcionando sin internet.** No se perdió la ventaja del modelo anterior: `firebase.js`
+inicializa Firestore con `persistentLocalCache`, que guarda una copia en IndexedDB (igual que
+hacía Dexie) y sincroniza al recuperar la red.
+
+- *Efecto secundario a tener en cuenta al depurar:* la app puede **parecer que funciona sin
+  haber hablado con el servidor**, porque lee de esa copia local. Para probar de verdad una
+  lectura o una regla, usar una **ventana de incógnito** (caché vacía) y mirar la consola.
+
+## Seguridad: reglas de Firestore
+
+Las claves de Firebase (`apiKey`, `projectId`…) **son públicas por diseño**: viajan dentro del
+bundle, cualquiera puede leerlas con F12. No son una contraseña, solo identifican el proyecto.
+Lo que protege los datos **no** son las claves, sino las **reglas de seguridad**.
+
+Las reglas se evalúan **en el servidor de Google**, antes de tocar los datos, en toda petición:
+venga de la app, de otra app o de la **API REST** de Firestore (que es pública y no necesita tu
+código para nada). Por eso son la única defensa real.
+
+Fuente de la verdad: **`firestore.rules`** en la raíz del repo.
+
+```js
+match /users/{uid}/{documento=**} {
+  allow read, write: if request.auth != null && request.auth.uid == uid;
+}
+```
+
+- **`{documento=**}`** es un comodín **recursivo**: cubre `facturas/{id}`, `config/taller` y
+  cualquier subcolección que se añada en el futuro bajo el usuario.
+- **`request.auth != null`** → hay sesión iniciada.
+- **`request.auth.uid == uid`** → el uid del token coincide con el de la ruta. Lo rellena
+  Firebase tras validar el token de Google; **el cliente no puede falsearlo**.
+- Todo lo que no se permite explícitamente queda **denegado por defecto**.
+
+**Importante:** el archivo del repo no protege nada por sí solo. Las reglas que se aplican son
+las **publicadas** (consola de Firebase → Firestore Database → Rules). Es el mismo patrón que
+las variables `VITE_*` y el `sw.js`: repo y producción son cosas distintas hasta que se
+despliega.
+
+### Cómo se comprueban
+
+Dos pruebas complementarias, y **hacen falta las dos**: una regla probada solo por el lado que
+permite no está probada.
+
+1. **Que no estorban** — recorrer la app en incógnito (crear, leer, guardar config, borrar) con
+   la consola abierta. Silencio = bien; los hooks de `datos.js` registran cualquier
+   `permission-denied` con el prefijo `❌ Firestore …`.
+2. **Que sí protegen** — pedir datos **sin credenciales** a la API REST. Debe responder `403
+   PERMISSION_DENIED`:
+
+   ```
+   curl "https://firestore.googleapis.com/v1/projects/PROJECT_ID/databases/(default)/documents/users/xyz/facturas"
+   ```
+
+La consola trae además un **Rules Playground** para simular peticiones (elegir operación, ruta y
+si hay usuario autenticado). Firebase está empujando a sustituirlo por el **Emulator Suite**,
+que levanta un Firestore local y permite escribir **tests automáticos** de las reglas con
+`@firebase/rules-unit-testing` — pendiente en mejoras futuras. Ojo: el emulador prueba el
+**archivo local**, no lo publicado.
+
+### Lo que estas reglas NO hacen
+
+Controlan **quién** accede, no **qué** se escribe: un usuario autenticado puede guardar en su
+propia rama un documento con cualquier forma (una factura sin número, un total en texto). Para
+un usuario único no es un problema real; validar la forma de los datos en las reglas sería el
+paso siguiente, y encaja cuando se implemente *editar factura*.
 
 ## Anatomía de un archivo `.jsx` — las 3 capas
 
@@ -394,16 +456,24 @@ El nombre `.jsx` (en vez de `.js`) es la pista de que dentro hay JSX además de 
 ## Estado del plan (MVP)
 
 1. ✅ Proyecto React + Vite
-2. ✅ Modelo de datos (Dexie + funciones de cálculo)
+2. ✅ Modelo de datos (Dexie + funciones de cálculo) — *la capa de datos se migró luego a
+   Firestore; ver `cambios.md` (16/07/2026)*
 3. ✅ Pantallas: lista, crear factura, detalle, configuración
 4. ✅ Generación de PDF (html2canvas-pro + jsPDF + Web Share API)
 5. ✅ PWA instalable (vite-plugin-pwa)
 
 **MVP completo.**
 
-**Extra (post-MVP):** ✅ Tests automáticos con Vitest sobre la lógica de negocio
-(12 tests) + corrección del redondeo de importes (coma flotante). Ver sección *Testing*.
-✅ Onboarding de primer uso. Ver sección *Onboarding*.
+**Extra (post-MVP):**
+- ✅ Tests automáticos con Vitest sobre la lógica de negocio (hoy **46 tests**) + corrección
+  del redondeo de importes (coma flotante). Ver sección *Testing*.
+- ✅ Onboarding de primer uso. Ver sección *Onboarding*.
+- ✅ Validaciones de formulario (obligatorios, NIF, teléfono, importes) — 08/07/2026.
+- ✅ Búsqueda por matrícula, filtros por año/mes y cliente recurrente — 16-17/07/2026.
+- ✅ Sincronización multi-dispositivo con Firebase (Auth + Firestore) — 13-16/07/2026.
+- ✅ Manejo de errores: Error Boundary + respaldo en `index.html` — 17/07/2026.
+- ✅ **Reglas de seguridad de Firestore** (cada usuario solo ve sus datos) — 06/08/2026.
+  Ver sección *Seguridad*.
 
 ## Onboarding (primer uso)
 
@@ -412,7 +482,7 @@ del taller** (la Configuración es por-dispositivo, ver *Arquitectura de datos*)
 el usuario podría crear facturas con la cabecera del PDF en blanco (sin nombre, NIF ni
 teléfono del taller). El onboarding lo evita guiando al usuario a configurarse primero.
 
-Dos piezas, ambas guiadas por si existe o no el registro de configuración (`db.config.get(1)`):
+Dos piezas, ambas guiadas por si existe o no el documento de configuración (`useConfig()`):
 
 1. **Redirección** (`ListaFacturas.jsx`): la pantalla de inicio (`/`) comprueba la config y,
    si no hay, redirige a `/configuracion` con `<Navigate to="/configuracion" replace />`.
@@ -422,15 +492,24 @@ Dos piezas, ambas guiadas por si existe o no el registro de configuración (`db.
    muestra un aviso "👋 completa los datos de tu taller", con renderizado condicional
    (`{primeraVez && (...)}`) sobre un estado `useState`.
 
-**Detalle técnico importante — distinguir "cargando" de "vacío":** `useLiveQuery` devuelve
-`undefined` mientras carga, y `db.config.get(1)` **también** devuelve `undefined` si no hay
-config. Para no redirigir por error durante el instante de carga, la consulta convierte el
-"no encontrado" en `null` explícito con `?? null`, logrando tres estados distinguibles:
+**Detalle técnico importante — distinguir "cargando" de "vacío":** si el hook devolviera
+`undefined` en los dos casos (mientras carga y cuando no hay config), la app redirigiría a
+`/configuracion` durante el instante de carga. Por eso `useConfig` convierte el "no existe" en
+`null` **explícito**, logrando tres estados distinguibles:
 
 ```js
-const config = useLiveQuery(() => db.config.get(1).then((c) => c ?? null))
+// datos.js — dentro de useConfig()
+onSnapshot(refConfig(usuario.uid), (snap) => {
+  setConfig(snap.exists() ? snap.data() : null)   // ← el null explícito
+})
 // undefined → cargando  |  null → sin config (onboarding)  |  objeto → hay config
 ```
+
+Las pantallas se apoyan en los tres estados: `ListaFacturas.jsx:24` espera mientras algo sea
+`undefined` y `ListaFacturas.jsx:27` redirige solo cuando la config es `null`.
+
+*(El patrón viene de la época de Dexie, donde `useLiveQuery` devolvía `undefined` al cargar y
+`db.config.get(1)` también si no había registro; se resolvía igual, con un `?? null`.)*
 
 ## Despliegue
 
@@ -452,11 +531,15 @@ explicaciones de configuración van aquí, en la documentación, y no dentro del
 
 ## Mejoras futuras / pendiente
 
-- **Validaciones** en los campos de los formularios (obligatorios, formatos de NIF,
-  importes numéricos válidos, etc.) usando las validaciones de React Hook Form.
-- **Quitar los `0` como placeholder** en los campos de importe: al pulsar en un campo
-  numérico (precio, mano de obra…) el `0` inicial molesta; que el campo aparezca vacío o
-  se borre el 0 al enfocarlo.
+> La cola viva de mejoras está al final de **`cambios.md`**, que se actualiza en cada sesión.
+> Aquí quedan solo las de calado técnico, con su porqué. *(Las validaciones de formulario y el
+> `0` de los campos de importe, que figuraban aquí, se hicieron el 08/07/2026.)*
+
+- **Tests automáticos de las reglas de seguridad** con Emulator Suite
+  (`firebase-tools` + `@firebase/rules-unit-testing`): convertiría las comprobaciones manuales
+  de la sección *Seguridad* en tests ejecutables junto a los de Vitest. Requiere instalar el
+  emulador y una JDK. Ojo: prueba el archivo `firestore.rules` **local**, no lo publicado.
+- **Validación de forma en las reglas**: hoy controlan quién accede, no qué se escribe.
 - **README** del repositorio (usar este documento como base).
 - **Logo real** del taller (el campo `logo` de la config aún no se usa).
 - **PDF multipágina** si alguna factura no cabe en un A4.

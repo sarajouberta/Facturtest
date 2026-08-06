@@ -1,0 +1,35 @@
+// Reglas de seguridad de Firestore — Facturtest
+//
+// Se aplican en el SERVIDOR, no en el navegador: da igual lo que haga el cliente
+// (o alguien con las claves del proyecto, que viajan en el bundle y son públicas),
+// porque toda lectura y escritura pasa por aquí antes de tocar los datos.
+//
+// Modelo de datos (ver src/datos.js):
+//   users/{uid}/facturas/{idFactura}
+//   users/{uid}/config/taller
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Todo lo de la app cuelga del usuario. {documento=**} es un comodín
+    // RECURSIVO: cubre las facturas, la config y cualquier subcolección que
+    // se añada más adelante bajo users/{uid}.
+    match /users/{uid}/{documento=**} {
+
+      // Solo el dueño. Dos condiciones:
+      //   request.auth != null        → hay sesión iniciada
+      //   request.auth.uid == uid     → el uid del token coincide con el de la ruta
+      //
+      // request.auth lo rellena Firebase tras validar el token de Google; el
+      // cliente no puede falsearlo. Por eso basta con esta línea: un usuario
+      // logueado solo alcanza su propia rama del árbol.
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // No hace falta denegar el resto: en Firestore lo que no está permitido
+    // explícitamente queda DENEGADO por defecto. Cualquier ruta que no case
+    // con el match de arriba se rechaza.
+  }
+}

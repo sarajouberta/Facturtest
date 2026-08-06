@@ -5,6 +5,89 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-06 — Reglas de seguridad de Firestore (Fase 5)
+
+La base llevaba desde el 13 de julio **en modo de prueba**, es decir, abierta. Se cierra.
+
+### El punto de partida: dos problemas en una sola regla
+
+```js
+match /{document=**} {
+  allow read, write: if request.time < timestamp.date(2026, 8, 12);
+}
+```
+
+1. **Abierta a cualquiera, hoy.** El `match` es la **raíz** (`/{document=**}` = toda la base) y
+   la única condición es **la fecha**: no se menciona `request.auth`, así que **ni siquiera hace
+   falta estar logueado**. Con el `projectId` (que viaja en el bundle y es público por diseño)
+   cualquiera podía leer o borrar las facturas usando la **API REST** de Firestore, sin pasar
+   por la app.
+2. **Cerrada del todo a partir del 12 de agosto.** Es la caducidad de 30 días del modo prueba.
+   Al vencer, la condición deja de cumplirse y Firestore **deniega todo**. Peor aún: la app no
+   avisa, simplemente se queda sin datos (lista vacía, config sin cargar) y el error solo se ve
+   en la consola del navegador.
+
+### Las reglas nuevas (`firestore.rules`, en la raíz del repo)
+
+```js
+match /users/{uid}/{documento=**} {
+  allow read, write: if request.auth != null && request.auth.uid == uid;
+}
+```
+
+- El `match` deja de ser la raíz y pasa a ser **la rama de un usuario**. `{documento=**}` es un
+  comodín **recursivo**: cubre `facturas/{id}`, `config/taller` y cualquier subcolección futura.
+- La condición pasa de una fecha a **la identidad**: hay sesión **y** el uid del token coincide
+  con el de la ruta. `request.auth` lo rellena Firebase tras validar el token de Google, así que
+  **el cliente no puede falsearlo**.
+- Desaparece la caducidad: no hace falta fecha límite cuando la regla es correcta de por sí.
+- Lo que no se permite explícitamente queda **denegado por defecto**; no hay que escribirlo.
+
+**El archivo del repo no protege nada por sí solo:** es la fuente de la verdad para el
+histórico, pero las reglas que se aplican son las **publicadas** en la consola de Firebase.
+Mismo patrón que las variables `VITE_*` y que el `sw.js`: lo que hay en el repo y lo que hay en
+producción son cosas distintas hasta que se despliega.
+
+### Verificación
+
+**1. Que no estorban (recorrido por la app, en ventana de incógnito).** Las seis operaciones de
+`datos.js` en verde y sin errores en consola: *list*, *get*, *create*, *write* de config y
+*delete*.
+
+- *Por qué en incógnito:* con `persistentLocalCache` activo, Firestore sirve la copia local del
+  dispositivo, así que la app **puede parecer que funciona sin haber hablado con el servidor**.
+  En incógnito la caché está vacía → si los datos aparecen, han venido del servidor y han
+  atravesado las reglas. (De hecho el primer intento salió contaminado: una extensión del
+  navegador bloqueaba `firestore.googleapis.com` con `ERR_BLOCKED_BY_CLIENT` — que es
+  *"cancelado por tu propio navegador"*, no un rechazo del servidor — y las facturas que se
+  veían salían de la caché.)
+
+**2. Que sí protegen (API REST, sin credenciales).** Es la prueba de verdad: peticiones reales
+contra la base de producción, sin token, que es justo lo que haría un curioso.
+
+```
+GET  /v1/projects/facturtest-6b96e/databases/(default)/documents/users/xyz/facturas    → 403
+GET  …/users/xyz/config/taller                                                         → 403
+POST …/users/xyz/facturas                                                              → 403
+```
+
+Las tres devuelven `PERMISSION_DENIED`. **Con las reglas viejas, estas mismas peticiones habrían
+devuelto los datos.** Mejor prueba que el *Rules Playground* de la consola, que solo simula.
+
+### Pendiente
+- Falta comprobar la segunda mitad de la condición (`request.auth.uid == uid`): que un usuario
+  **logueado** tampoco entre en la rama de otro. Requiere una segunda cuenta de Google; al
+  entrar debe ver **la lista vacía**, no las facturas de la primera.
+- **Emulator Suite** (`firebase-tools` + `@firebase/rules-unit-testing`): permitiría convertir
+  estas comprobaciones en **tests automáticos de las reglas**, ejecutables junto a los de
+  Vitest. Queda en mejoras futuras. Nota: el emulador prueba el **archivo local**, no lo
+  publicado.
+- Las reglas controlan **quién** escribe, no **qué** escribe: un dueño autenticado puede guardar
+  en su rama un documento con cualquier forma. Validar la forma de la factura encaja mejor
+  cuando se implemente *editar factura*.
+
+---
+
 ## 2026-08-06 — El service worker secuestraba el login (cierre del arreglo de julio)
 
 El arreglo del 27 de julio (redirección + proxy) se había subido pero **nunca se llegó a
