@@ -70,6 +70,92 @@ para fidelidad de impresión, y se mantiene oculta fuera de pantalla
 | **Service Worker** (`dist/sw.js`) | Cachea la app para que funcione **sin internet** tras la primera carga. Lo genera el plugin. | Generado en el build |
 | **Web App Manifest** | Define nombre, icono y colores al instalar la app (`display: standalone` = a pantalla completa, sin barra del navegador). | Generado en el build; iconos en `public/` |
 
+### ¿Qué es un Service Worker?
+
+Es un archivo JavaScript que el navegador ejecuta **aparte de la página**, en su propio hilo
+de fondo. No tiene acceso al DOM (no puede tocar la interfaz, ni leer un `<input>`, ni pintar
+nada) y sigue vivo aunque se cierre la pestaña. A cambio tiene un poder que ningún otro
+código de la app tiene:
+
+> **Se pone en medio entre la app y la red.** Cada vez que el navegador va a pedir algo — un
+> `.js`, una imagen, una navegación a una URL — el service worker lo intercepta primero y
+> decide qué responder: dejarlo pasar a internet, responder con una copia guardada en caché,
+> o incluso inventarse la respuesta.
+
+Es, en la práctica, un **proxy que vive dentro del navegador**, del lado del cliente.
+
+**Para qué sirve aquí:** es lo que hace que Facturtest funcione en el taller sin cobertura.
+Con el móvil en modo avión no hay servidor al que pedir nada, pero el service worker tiene
+guardados el HTML, el JS y el CSS y los sirve él, así que la app arranca. (Los datos son otra
+historia: viven en el propio dispositivo, hoy en la caché offline de Firestore.)
+
+**El mismo poder es un arma de doble filo:** si una URL del dominio propio *no* es una ruta de
+la app, el service worker la intercepta igual. Es exactamente lo que rompió el login con
+Google en agosto de 2026 (ver `cambios.md`).
+
+#### Ciclo de vida: por qué hay que reinstalar la PWA
+
+Un service worker **no se actualiza como un archivo normal**. Pasa por
+**install → waiting → activate**, y el detalle importante es el estado intermedio: mientras
+quede una ventana abierta controlada por la versión vieja, la nueva **espera en la banda** sin
+activarse. Está diseñado así a propósito, para evitar que media app funcione con la versión
+antigua y la otra media con la nueva.
+
+- `registerType: 'autoUpdate'` (en `vite.config.js`) hace que el plugin genere el código que
+  empuja a la versión nueva a saltarse esa cola.
+- Aun así, en un móvil con la PWA instalada y pantallas en segundo plano la transición es poco
+  fiable. **Desinstalar y reinstalar la app** es la forma bruta de garantizar que el service
+  worker viejo desaparece.
+- Es la causa de los dos sustos post-deploy del proyecto: la pantalla en blanco de julio y el
+  "Cargando…" eterno de agosto. Ante un comportamiento raro tras desplegar, **sospechar
+  siempre del service worker viejo**.
+
+### ¿Qué es Workbox?
+
+Escribir un service worker a mano es tedioso y fácil de estropear: hay que versionar las
+cachés, elegir estrategia para cada tipo de archivo, limpiar las cachés viejas al activar,
+evitar que crezcan sin límite…
+
+**Workbox es la librería de Google que trae todo eso ya resuelto.** No es un estándar del
+navegador ni magia: es código que envuelve la API de service workers y ofrece recetas con
+nombre (`CacheFirst`, `NetworkFirst`, `StaleWhileRevalidate`, precaching automático de los
+archivos del build).
+
+En este proyecto **nunca se escribe un service worker a mano**. La cadena es:
+
+```
+npm run build
+  └─ vite-plugin-pwa recoge lo que Vite ha generado
+      └─ le pasa a Workbox la configuración del bloque workbox: { ... }
+          └─ Workbox escribe dist/sw.js  ← el service worker de verdad
+```
+
+Por eso el bloque de `vite.config.js` se llama `workbox`: **es la configuración que el plugin
+le pasa a Workbox** para generar el archivo. Y por eso cualquier cambio ahí solo surte efecto
+tras un build y un deploy nuevos — el service worker es un **artefacto de compilación**, igual
+que las variables `VITE_*`.
+
+#### `navigateFallback` y la lista de excepciones
+
+Workbox distingue las peticiones de **navegación** (teclear una URL, pulsar un enlace, una
+redirección) del resto de recursos. En una SPA todas las rutas (`/`, `/nueva-factura`,
+`/factura/7`) se sirven con el mismo `index.html` y es React Router quien decide qué pintar;
+`navigateFallback: index.html` codifica precisamente eso, y es lo que permite abrir
+`/factura/7` sin conexión.
+
+El problema es que esa regla dice *cualquier* navegación, y `/__/auth/handler` **no es una ruta
+de la app**: es una puerta al servidor de Firebase que, por el proxy de `vercel.json`, resulta
+que vive en el dominio propio. De ahí la lista de excepciones:
+
+```js
+workbox: {
+  navigateFallbackDenylist: [/^\/__\/auth\//],   // "esto no es mío, déjalo ir a la red"
+}
+```
+
+Se puede comprobar en el `sw.js` publicado, que acaba con:
+`registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html"), {denylist:[/^\/__\/auth\//]}))`.
+
 ## Código propio (lógica de negocio)
 
 | Archivo | Para qué |
@@ -353,7 +439,13 @@ a `main` la redespliega automáticamente. URL: https://facturtest.vercel.app
 
 | Archivo | Para qué |
 |---|---|
-| `vercel.json` | Redirige TODAS las rutas a `index.html` (`rewrites`) para que el enrutado de React Router funcione en producción (si no, recargar en `/nueva-factura` o `/configuracion` daría 404). |
+| `vercel.json` | Dos `rewrites`, **en orden**: (1) `/__/auth/:path*` → el proyecto de Firebase (proxy del login, para que la redirección de Google ocurra en el dominio propio y no haya cookies de terceros); (2) el resto de rutas → `index.html`, para que el enrutado de React Router funcione en producción (si no, recargar en `/nueva-factura` daría 404). |
+
+El orden importa: la regla comodín `/(.*)` se traga todo lo que llegue hasta ella, así que la
+del login tiene que ir **antes**. Ojo: esa misma dualidad hay que repetirla en el service
+worker (`navigateFallbackDenylist`), que aplica la regla del `index.html` por su cuenta desde
+dentro del navegador — arreglar solo `vercel.json` no basta. Ver *PWA*.
+
 
 Nota: JSON no admite comentarios (`//` o `/* */` rompen el archivo); por eso las
 explicaciones de configuración van aquí, en la documentación, y no dentro del `.json`.

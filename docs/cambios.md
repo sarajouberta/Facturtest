@@ -5,6 +5,80 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-06 — El service worker secuestraba el login (cierre del arreglo de julio)
+
+El arreglo del 27 de julio (redirección + proxy) se había subido pero **nunca se llegó a
+verificar en el móvil**. Al comprobarlo aparecieron **dos fallos encadenados**: uno de
+despliegue y otro de la propia PWA.
+
+### Fallo 1: el `authDomain` nuevo no estaba en producción
+
+El proxy de `vercel.json` funcionaba (pedir `/__/auth/handler` al sitio publicado devolvía el
+manejador real de Firebase, no el `index.html`), pero en el **bundle desplegado** el
+`authDomain` compilado seguía siendo `facturtest-6b96e.firebaseapp.com` en vez de
+`facturtest.vercel.app`. Sin esa mitad, el proxy no sirve de nada: la redirección seguía
+saliendo por el dominio de Firebase y volvía al problema de las cookies de terceros.
+
+- *Causa:* las variables **`VITE_*` no se leen en tiempo de ejecución**: Vite las **incrusta
+  en el código durante el `build`**. Cambiar la variable en el panel de Vercel no toca el
+  sitio ya publicado — solo afecta al **siguiente** build.
+- *Arreglo:* poner `VITE_FIREBASE_AUTH_DOMAIN=facturtest.vercel.app` en Vercel (Production) y
+  **redesplegar sin caché de build**. En `.env.local` se deja `…firebaseapp.com`, porque en
+  local se trabaja en el navegador de escritorio, donde el popup funciona y no hay proxy.
+- *Es el mismo mecanismo* que la pantalla en blanco del 17 de julio. Regla a recordar:
+  **tocar una variable de entorno en Vercel exige redeploy.**
+
+### Fallo 2: el service worker interceptaba la ruta de login
+
+Con el `authDomain` ya correcto, en el móvil el botón **"Entrar con Google" dejaba la pantalla
+en "Cargando…"** y no aparecía nunca el selector de cuenta de Google.
+
+- *Causa:* el service worker se genera con `navigateFallback: index.html` — *"ante cualquier
+  navegación dentro de mi dominio, sirve el `index.html` cacheado"*. Es justo lo que hace que
+  la app funcione sin conexión y que `/factura/7` no dé 404. **Pero el arreglo del proxy había
+  movido el login al dominio propio** (`facturtest.vercel.app/__/auth/…`), metiéndolo dentro
+  del radio de acción del service worker. Secuencia: `signInWithRedirect` navega a
+  `/__/auth/handler` → el service worker responde con el `index.html` cacheado → la app vuelve
+  a arrancar, ahora en la URL del handler y sin sesión → `cargando` se queda en `true` para
+  siempre. **Nunca se llegaba a Google.**
+- *Por qué costó verlo:* con `curl` funcionaba (curl no tiene service worker) y en el navegador
+  de escritorio también (usa popup, que va a `accounts.google.com` — dominio ajeno, fuera del
+  alcance del service worker). El fallo solo se daba en la **PWA instalada**.
+- *Ironía:* el arreglo del proxy funcionó *demasiado* bien. Al traer el login al dominio propio,
+  lo puso bajo la jurisdicción del service worker.
+
+**El arreglo (`vite.config.js`):** un bloque `workbox` con la lista de excepciones a esa regla.
+
+```js
+VitePWA({
+  registerType: 'autoUpdate',
+  workbox: {
+    // El service worker NO debe secuestrar las rutas de login de Firebase:
+    // si responde con el index.html cacheado, la redirección nunca llega a Google.
+    navigateFallbackDenylist: [/^\/__\/auth\//],
+  },
+  manifest: { /* … */ },
+})
+```
+
+`navigateFallbackDenylist` es una lista de expresiones regulares: las rutas que casen quedan
+**excluidas** de la regla del `index.html` y salen a la red, donde el proxy de Vercel las lleva
+a Firebase. Explicación conceptual de service worker y Workbox en `tecnologias.md`.
+
+### Verificación (en el sitio publicado)
+- `authDomain` compilado en el bundle = `facturtest.vercel.app`, y **cero** apariciones de
+  `firebaseapp.com`.
+- `/__/auth/handler` devuelve el HTML del manejador de Firebase (con `handler.js`), no el
+  `index.html` de la app.
+- `sw.js` de producción contiene `denylist:[/^\/__\/auth\//]`.
+
+### Nota operativa
+Tras cambiar la configuración de la PWA hay que **desinstalar y reinstalar la app en el móvil**.
+El service worker viejo sigue instalado con la regla antigua y no se reemplaza de forma fiable
+él solo (ver *ciclo de vida* en `tecnologias.md`).
+
+---
+
 ## 2026-07-27 — Login con Google roto en el móvil (PWA)
 
 Síntoma: en el móvil, al pulsar **"Entrar con Google"** no pasaba **nada**. La app está
