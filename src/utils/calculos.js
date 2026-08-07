@@ -25,8 +25,27 @@ export function calcularBaseImponible(totalMateriales, manoDeObra) {
     return redondear(totalMateriales + (Number(manoDeObra) || 0))
 }
 
+//el precio de la mano de obra ahora viene del valor puesto en la configuración: representado como 1h= 100
+export function calcularManoDeObra(tiempo, precioHora) {
+    const t = Number(tiempo) || 0
+    const p = Number(precioHora) || 0
+    return redondear((t / 100) * p)
+}
+
+/* Suma la mano de obra de todas las líneas. Cada línea es una tarea con su propio
+   tiempo y su propia tarifa, así que se calcula una a una y se suma; no vale
+   multiplicar un tiempo total por una tarifa única. */
+export function calcularTotalManoDeObra(lineas) {
+    const total = (lineas ?? []).reduce(
+        (suma, linea) => suma + calcularManoDeObra(linea?.tiempo, linea?.precioHora),
+        0,
+    )
+    return redondear(total)
+}
+
 // Total = base imponible + IVA aplicado sobre esa base
 export function calcularTotal(baseImponible, iva) {
     return redondear(baseImponible + baseImponible * (iva / 100))
 }
+
 

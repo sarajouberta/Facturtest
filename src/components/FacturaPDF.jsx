@@ -1,5 +1,13 @@
 /*Nota: usa estilos en línea (style={{...}}) con colores hex, no Tailwind, para
   que la captura salga fiel y sin sustos*/
+import { calcularManoDeObra } from '../utils/calculos'
+
+/* El tiempo se guarda en centésimas de hora (100 = 1 h), que es como lo apunta
+   el taller. En el PDF se imprime en horas, porque quien lo lee es el cliente:
+   "1,5 h" se entiende y "150" no. */
+function tiempoEnHoras(tiempo) {
+    return (Number(tiempo) || 0) / 100
+}
 
 function FacturaPDF({ factura, config }) {
     if (!factura) return null
@@ -123,6 +131,41 @@ function FacturaPDF({ factura, config }) {
                     ))}
                 </tbody>
             </table>
+
+            {/* Mano de obra desglosada. Solo las facturas nuevas llevan líneas;
+                las antiguas guardaban un único importe y no entran aquí. */}
+            {factura.lineasManoDeObra?.length > 0 && (
+                <table style={{
+                    width: '100%', borderCollapse: 'collapse', marginTop: '12px'
+                }}>
+                    <thead>
+                        <tr>
+                            <th style={{ ...th, width: '70px', textAlign: 'right' }}>Tiempo</th>
+                            <th style={th}>Mano de obra</th>
+                            <th style={{ ...th, width: '90px', textAlign: 'right' }}>Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {factura.lineasManoDeObra.map((l, i) => (
+                            <tr key={i}>
+                                <td style={{ ...td, textAlign: 'right' }}>
+                                    {tiempoEnHoras(l.tiempo).toLocaleString('es-ES')} h
+                                </td>
+                                <td style={td}>
+                                    {l.descripcion}
+                                    {' '}
+                                    <span style={{ color: '#6b7280' }}>
+                                        ({(Number(l.precioHora) || 0).toFixed(2)} €/h)
+                                    </span>
+                                </td>
+                                <td style={{ ...td, textAlign: 'right' }}>
+                                    {calcularManoDeObra(l.tiempo, l.precioHora).toFixed(2)} €
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
 
             {/* Totales */}
             <div style={{

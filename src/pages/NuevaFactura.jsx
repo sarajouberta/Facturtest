@@ -1,51 +1,75 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useFacturas, useConfig, crearFactura } from '../datos'
 
 import { generarSiguienteNumero } from '../utils/numeracion'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import { matriculaParaGuardar } from '../utils/matricula'
 import { buscarPorMatricula } from '../utils/busqueda'
+import { camposConfigPendientes } from '../utils/configuracion'
 import {
   calcularTotalMateriales,
   calcularBaseImponible,
   calcularTotal,
+  calcularManoDeObra,
+  calcularTotalManoDeObra,
 } from '../utils/calculos'
 
 function NuevaFactura() {
-  const { register, control, handleSubmit, watch, setValue, setError,
+  const { register, control, handleSubmit, watch, setValue, getValues, setError,
     formState: { errors } } = useForm({
-    defaultValues: {
-      numero: '',
-      fecha: new Date().toISOString().slice(0, 10),
-      cliente: {
-        nombre: '',
-        nif: '',
-        direccion: '',
-        localidad: '',
-        provincia: '',
-        telefono: '',
+      defaultValues: {
+        numero: '',
+        /* 'sv-SE' es el único locale estándar que da el formato AAAA-MM-DD que
+           necesita <input type="date">, pero calculado en la zona horaria del
+           dispositivo. Con toISOString() la fecha se calcula en UTC y, de
+           madrugada, saldría el día anterior. */
+        fecha: new Date().toLocaleDateString('sv-SE'),
+        cliente: {
+          nombre: '',
+          nif: '',
+          direccion: '',
+          localidad: '',
+          provincia: '',
+          telefono: '',
+        },
+        vehiculo: { modelo: '', vehiculo: '', matricula: '', km: '' },
+        trabajos: '',
+        /* precioUnitario arranca vacío, no a 0: ese 0 era el valor real del campo
+           y había que borrarlo a mano para escribir encima. Vacío deja ver el
+           placeholder y se convierte a 0 al guardar. */
+        conceptos: [{ descripcion: '', cantidad: 1, precioUnitario: '' }],
+        /* Cada línea de mano de obra es una tarea: qué se hizo, cuánto tiempo
+           (en centésimas de hora: 100 = 1 h) y a qué tarifa. La tarifa se
+           rellena desde la configuración del taller en cuanto carga. */
+        lineasManoDeObra: [{ descripcion: '', tiempo: '', precioHora: 0 }],
+        iva: 21,
       },
-      vehiculo: { modelo: '', vehiculo: '', matricula: '', km: '' },
-      trabajos: '',
-      conceptos: [{ descripcion: '', cantidad: 1, precioUnitario: 0 }],
-      manoDeObra: 0,
-      iva: 21,
-    },
-  })
+    })
   const { fields, append, remove } = useFieldArray({
     control, name: 'conceptos'
   })
+  /* Segundo array, independiente del de materiales. Sus fields/append/remove se
+     renombran al desestructurar porque los nombres originales ya están ocupados:
+     si se reutilizaran, las dos listas compartirían estado y serían la misma
+     pintada dos veces. */
+  const {
+    fields: fieldsManoDeObra,
+    append: appendManoDeObra,
+    remove: removeManoDeObra,
+  } = useFieldArray({ control, name: 'lineasManoDeObra' })
   const navigate = useNavigate()
   const [vehiculoRecurrente, setVehiculoRecurrente] = useState(null)
 
   // Valores observados en vivo para calcular los totales
   const conceptos = watch('conceptos')
-  const manoDeObra = watch('manoDeObra')
+  const lineasManoDeObra = watch('lineasManoDeObra')
   const iva = watch('iva')
 
   const totalMateriales = calcularTotalMateriales(conceptos)
+  // La mano de obra ya no se teclea: sale de sumar las líneas.
+  const manoDeObra = calcularTotalManoDeObra(lineasManoDeObra)
   const baseImponible = calcularBaseImponible(totalMateriales, manoDeObra)
   const total = calcularTotal(baseImponible, iva)
 
@@ -54,11 +78,39 @@ function NuevaFactura() {
   //de Firestore, por eso esperamos a que ambos hayan cargado (undefined = aún
   //cargando). config?: cubre el caso de que todavía no haya config guardada.
   const facturas = useFacturas()
-    const config = useConfig()
-    useEffect(() => {
-      if (facturas === undefined || config === undefined) return   // esperamos a que carguen
-      setValue('numero', generarSiguienteNumero(facturas, config?.numeroInicial))
-    }, [facturas, config, setValue])
+  const config = useConfig()
+  /* Los valores sugeridos se aplican UNA sola vez. Sin esto, el efecto vuelve a
+     ejecutarse cada vez que llegan datos nuevos por onSnapshot (una factura
+     guardada desde el móvil, un cambio de configuración desde otro dispositivo)
+     y sobrescribiría lo que el usuario tenga escrito a medio rellenar.
+     useRef y no useState: cambiarlo no debe provocar un repintado. */
+  const sugerenciasAplicadas = useRef(false)
+
+  useEffect(() => {
+    if (facturas === undefined || config === undefined) return   // esperamos a que carguen
+    if (sugerenciasAplicadas.current) return
+    sugerenciasAplicadas.current = true
+
+    setValue('numero', generarSiguienteNumero(facturas, config?.numeroInicial))
+
+    /* El IVA y la tarifa de mano de obra también salen de la configuración.
+       Number.isFinite descarta el NaN que deja un campo numérico vacío
+       (valueAsNumber): un ?? no serviría, porque NaN no es null ni undefined. */
+    if (Number.isFinite(config?.iva)) setValue('iva', config.iva)
+
+    if (Number.isFinite(config?.precioManoDeObra)) {
+      // Solo las líneas que aún no tienen tarifa, para no pisar una escrita a mano.
+      getValues('lineasManoDeObra').forEach((linea, i) => {
+        if (!linea.precioHora) {
+          setValue(`lineasManoDeObra.${i}.precioHora`, config.precioManoDeObra)
+        }
+      })
+    }
+  }, [facturas, config, setValue, getValues])
+
+  /* Datos del taller que faltan por rellenar. Mientras la config carga (undefined)
+     no se avisa de nada, para que no parpadee el aviso al abrir la pantalla. */
+  const pendientesConfig = config === undefined ? [] : camposConfigPendientes(config)
 
   // register de la matrícula en una variable para poder encadenar su onBlur
   // (validación de RHF) con nuestra búsqueda de vehículo recurrente.
@@ -83,14 +135,17 @@ function NuevaFactura() {
   const onSubmit = async (datos) => {
     // Recalculamos y "congelamos" los importes al guardar
     const totalMateriales = calcularTotalMateriales(datos.conceptos)
-    const baseImponible = calcularBaseImponible(totalMateriales,
-      datos.manoDeObra)
+    const manoDeObra = calcularTotalManoDeObra(datos.lineasManoDeObra)
+    const baseImponible = calcularBaseImponible(totalMateriales, manoDeObra)
     const total = calcularTotal(baseImponible, datos.iva)
 
     //Regla de negocio: la factura debe tener algún importe.
     //Cambio: aunque sean casos muy raros, la factura puede no tener mano de obra (ej. cambiar batería no la cobra)
     if (baseImponible <= 0) {
-      setError('manoDeObra', {
+      /* Es una regla del formulario entero, no de un campo concreto: por eso va
+         en 'root' y se pinta junto a los totales. Antes colgaba de 'manoDeObra',
+         que ya no existe como campo. */
+      setError('root.importe', {
         type: 'manual',
         message: 'La factura debe tener piezas o mano de obra (no puede ser 0 €)',
       })
@@ -101,11 +156,37 @@ function NuevaFactura() {
     // así en la factura sale siempre uniforme, teclee como teclee.
     const matricula = matriculaParaGuardar(datos.vehiculo?.matricula)
 
+    /* El tiempo se teclea en un campo de texto, así que llega como cadena
+       ('100'). Se convierte a número antes de guardar: en la base de datos debe
+       ser un número, no texto. Los cálculos ya lo toleraban, pero el dato no
+       tiene por qué quedar sucio. */
+    const lineasManoDeObra = (datos.lineasManoDeObra ?? []).map((linea) => ({
+      ...linea,
+      tiempo: Number(linea.tiempo) || 0,
+    }))
+
+    /* Igual con los materiales: un campo numérico en blanco deja NaN (es lo que
+       devuelve valueAsNumber), y NaN no debe llegar a la base de datos. Los
+       cálculos ya lo toleran, pero el dato guardado tiene que estar limpio. */
+    const conceptos = (datos.conceptos ?? []).map((concepto) => ({
+      ...concepto,
+      cantidad: Number(concepto.cantidad) || 0,
+      precioUnitario: Number(concepto.precioUnitario) || 0,
+    }))
+
     try {
       await crearFactura({
         ...datos,
+        conceptos,
+        lineasManoDeObra,
         vehiculo: { ...datos.vehiculo, matricula },
         totalMateriales,
+        /* Se guarda el importe total de la mano de obra ya calculado, además de
+           las líneas (que van dentro de ...datos). Una factura es un documento
+           emitido: debe conservar la cifra que se cobró, no una que se recalcule
+           si mañana cambia la tarifa. Además, las facturas antiguas solo tienen
+           este campo, y así todas se leen igual. */
+        manoDeObra,
         baseImponible,
         total,
       })
@@ -121,13 +202,23 @@ function NuevaFactura() {
       <h2 className="text-xl font-bold mb-1">Nueva factura</h2>
       <p className="text-sm text-gray-500 mb-4">Los campos con * son obligatorios.</p>
 
+      {/* Avisa, pero no bloquea: se puede facturar rellenando los datos a mano */}
+      {pendientesConfig.length > 0 && (
+        <div className="bg-yellow-50 text-yellow-900 border border-yellow-300 rounded p-3 mb-4 text-sm">
+          ⚠️ Faltan datos del taller en la configuración:{' '}
+          <strong>{pendientesConfig.join(', ')}</strong>. Sin ellos, la factura puede salir
+          incompleta o con la tarifa a 0.{' '}
+          <Link to="/configuracion" className="underline font-medium">Completar ahora</Link>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
 
         {/* Número y fecha */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Factura</legend>
           <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Número *</span>
+            <span className="text-sm font-bold">Número *</span>
             <input type="number" min="1" className="border rounded px-3 py-2"
               {...register('numero', { required: 'El número es obligatorio' })}
             />
@@ -136,16 +227,19 @@ function NuevaFactura() {
             )}
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Fecha</span>
+            <span className="text-sm font-bold">Fecha *</span>
             <input type="date" className="border rounded px-3 py-2"
-              {...register('fecha')} />
+              {...register('fecha', { required: 'La fecha es obligatoria' })} />
+            {errors.fecha && (
+              <span className="text-red-600 text-sm">{errors.fecha.message}</span>
+            )}
           </label>
         </fieldset>
 
         {/* Datos del vehículo — primero, porque la matrícula reconoce al cliente */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Vehículo</legend>
-          <input className="border rounded px-3 py-2" placeholder="Matrícula * (p. ej. 1234 ABC)"
+          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Matrícula * (p. ej. 1234 ABC)"
             {...matriculaReg}
             onBlur={(e) => { matriculaReg.onBlur(e); buscarVehiculo(e.target.value) }} />
           {errors.vehiculo?.matricula && (
@@ -153,7 +247,7 @@ function NuevaFactura() {
           )}
           {vehiculoRecurrente && (
             <div className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 text-sm flex items-center justify-between gap-2">
-              <span>🚗 Este vehículo ya está: <strong>{vehiculoRecurrente.cliente?.nombre}</strong>. ¿Rellenar sus datos?</span>
+              <span> Este vehículo ya está: <strong>{vehiculoRecurrente.cliente?.nombre}</strong>. ¿Rellenar sus datos?</span>
               <button
                 type="button"
                 onClick={rellenarVehiculoRecurrente}
@@ -163,12 +257,12 @@ function NuevaFactura() {
               </button>
             </div>
           )}
-          <input className="border rounded px-3 py-2" placeholder="Modelo *"
+          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Modelo *"
             {...register('vehiculo.modelo', { required: 'El modelo es obligatorio' })} />
           {errors.vehiculo?.modelo && (
             <span className="text-red-600 text-sm">{errors.vehiculo.modelo.message}</span>
           )}
-          <input className="border rounded px-3 py-2" placeholder="Marca *"
+          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Marca *"
             {...register('vehiculo.vehiculo', { required: 'La marca es obligatoria' })} />
           {errors.vehiculo?.vehiculo && (
             <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
@@ -177,22 +271,23 @@ function NuevaFactura() {
             {...register('vehiculo.km')} />
         </fieldset>
 
+
         {/* Datos del cliente */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Cliente</legend>
-          <input className="border rounded px-3 py-2" placeholder="Nombre *"
-            {...register('cliente.nombre',{ required: 'El nombre del cliente es obligatorio' })} />
-            {errors.cliente?.nombre && (
-              <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
-            )}
-          <input className="border rounded px-3 py-2" placeholder="DNI / CIF * (p. ej. 12345678Z)"
+          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Nombre *"
+            {...register('cliente.nombre', { required: 'El nombre del cliente es obligatorio' })} />
+          {errors.cliente?.nombre && (
+            <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
+          )}
+          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="DNI / CIF * (p. ej. 12345678Z)"
             {...register('cliente.nif', {
               required: 'El DNI del cliente es obligatorio',
               validate: (v) => nifValido(v) || 'DNI/CIF no válido',
             })} />
-            {errors.cliente?.nif && (
-              <span className="text-red-600 text-sm">{errors.cliente.nif.message}</span>
-            )}
+          {errors.cliente?.nif && (
+            <span className="text-red-600 text-sm">{errors.cliente.nif.message}</span>
+          )}
           <input className="border rounded px-3 py-2" placeholder="Domicilio"
             {...register('cliente.direccion')} />
           <input className="border rounded px-3 py-2" placeholder="Localidad"
@@ -203,9 +298,9 @@ function NuevaFactura() {
             {...register('cliente.telefono', {
               validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
             })} />
-            {errors.cliente?.telefono && (
-              <span className="text-red-600 text-sm">{errors.cliente.telefono.message}</span>
-            )}
+          {errors.cliente?.telefono && (
+            <span className="text-red-600 text-sm">{errors.cliente.telefono.message}</span>
+          )}
         </fieldset>
 
         {/* Trabajos realizados */}
@@ -222,11 +317,21 @@ function NuevaFactura() {
         {/* Materiales (líneas de concepto) */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Materiales</legend>
+          {/* Cabecera de columnas. Hace falta porque los placeholders desaparecen
+              en cuanto se escribe: sin esto quedan casillas sueltas sin nombre.
+              Los anchos deben coincidir con los de los inputs de abajo. */}
+          <div className="flex gap-2 items-center text-xs font-medium text-gray-500">
+            <span className="flex-1">Descripción materiales</span>
+            <span className="w-20 text-right">Cant.</span>
+            <span className="w-24 text-right">Precio</span>
+            <span className="w-20 text-right">Importe</span>
+            <span className="w-8" aria-hidden="true"></span>
+          </div>
           {fields.map((field, index) => (
             <div key={field.id} className="flex gap-2 items-center">
               <input
                 className="border rounded px-3 py-2 flex-1"
-                placeholder="Descripción"
+                placeholder="Descripción materiales"
                 {...register(`conceptos.${index}.descripcion`)}
               />
               <input
@@ -252,8 +357,13 @@ function NuevaFactura() {
                 })}
                 onFocus={(e) => e.target.select()}
               />
+              {/* Importe de la línea, en vivo */}
+              <span className="w-20 text-right text-sm text-gray-600">
+                {((Number(conceptos?.[index]?.cantidad) || 0) *
+                  (Number(conceptos?.[index]?.precioUnitario) || 0)).toFixed(2)} €
+              </span>
               <button type="button" onClick={() => remove(index)}
-                className="text-red-600 px-2">
+                className="text-red-600 w-8">
                 ✕
               </button>
             </div>
@@ -267,7 +377,7 @@ function NuevaFactura() {
             type="button"
             onClick={() => append({
               descripcion: '', cantidad: 1,
-              precioUnitario: 0
+              precioUnitario: ''
             })}
             className="text-blue-600 self-start"
           >
@@ -275,26 +385,86 @@ function NuevaFactura() {
           </button>
         </fieldset>
 
-        {/* Mano de obra e IVA */}
+        {/* Mano de obra: una línea por tarea, con su tiempo y su tarifa */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
-          <legend className="font-semibold px-1">Mano de obra e IVA</legend>
-          <label className="flex flex-col gap-1">
-            <span className="text-sm font-medium">Mano de obra (€)</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className="border rounded px-3 py-2"
-              {...register('manoDeObra', {
-                valueAsNumber: true,
-                min: { value: 0, message: 'La mano de obra no puede ser negativa' },
-              })}
-              onFocus={(e) => e.target.select()}
-            />
-            {errors.manoDeObra && (
-              <span className="text-red-600 text-sm">{errors.manoDeObra.message}</span>
-            )}
-          </label>
+          <legend className="font-semibold px-1">Mano de obra</legend>
+          {/* Mismos anchos que los inputs de abajo, para que las columnas cuadren */}
+          <div className="flex gap-2 items-center text-xs font-medium text-gray-500">
+            <span className="flex-1">Tarea</span>
+            <span className="w-24 text-right">Tiempo</span>
+            <span className="w-24 text-right">€/hora</span>
+            <span className="w-20 text-right">Importe</span>
+            <span className="w-8" aria-hidden="true"></span>
+          </div>
+          {fieldsManoDeObra.map((field, index) => (
+            <div key={field.id} className="flex gap-2 items-center">
+              <input className="border rounded px-3 py-2 flex-1" placeholder="Tarea"
+                {...register(`lineasManoDeObra.${index}.descripcion`)}
+              />
+              {/* Campo de texto, no type="number": así no aparece el spinner (las
+                  flechitas) ni el navegador impone sus propias reglas de step.
+                  inputMode="numeric" hace que en el móvil salga el teclado de
+                  cifras. La regla la ponemos nosotros: solo dígitos, sin
+                  decimales ni signo. Vacío se admite y cuenta como 0. */}
+              <input type="text" inputMode="numeric"
+                className="border rounded px-3 py-2 w-24" placeholder="Tiempo"
+                {...register(`lineasManoDeObra.${index}.tiempo`, {
+                  pattern: {
+                    value: /^\d*$/,
+                    message: 'El tiempo debe ser un número entero, sin decimales',
+                  },
+                })}
+                onFocus={(e) => e.target.select()}
+              />
+              <input type="number" step="0.01" min="0"
+                className="border rounded px-3 py-2 w-24" placeholder="€/hora"
+                {...register(`lineasManoDeObra.${index}.precioHora`, {
+                  valueAsNumber: true,
+                  min: { value: 0, message: 'La tarifa no puede ser negativa' },
+                })}
+                onFocus={(e) => e.target.select()}
+              />
+              {/* Importe de esta línea, en vivo: ayuda a ver que 50 son media hora */}
+              <span className="w-20 text-right text-sm text-gray-600">
+                {calcularManoDeObra(
+                  lineasManoDeObra?.[index]?.tiempo,
+                  lineasManoDeObra?.[index]?.precioHora,
+                ).toFixed(2)} €
+              </span>
+              <button type="button" onClick={() => removeManoDeObra(index)}
+                className="text-red-600 w-8">
+                ✕
+              </button>
+            </div>
+          ))}
+          {errors.lineasManoDeObra && (
+            <span className="text-red-600 text-sm">
+              Revisa los tiempos y las tarifas de la mano de obra.
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => appendManoDeObra({
+              descripcion: '',
+              tiempo: '',
+              // La línea nueva nace con la tarifa del taller ya puesta
+              precioHora: Number.isFinite(config?.precioManoDeObra)
+                ? config.precioManoDeObra
+                : 0,
+            })}
+            className="text-blue-600 self-start" >
+            + Añadir mano de obra
+          </button>
+          {/* La pista va debajo, junto a los campos, y no arriba del todo */}
+          <p className="text-sm text-gray-500">
+            El tiempo va en centésimas de hora: <strong>100</strong> = 1 hora ·
+            <strong> 50</strong> = media hora · <strong>25</strong> = cuarto de hora.
+          </p>
+        </fieldset>
+
+        {/* IVA */}
+        <fieldset className="flex flex-col gap-3 border rounded p-4">
+          <legend className="font-semibold px-1">IVA</legend>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-medium">IVA (%)</span>
             <input
@@ -317,8 +487,13 @@ function NuevaFactura() {
 
         {/* Resumen de totales */}
         <div className="border rounded p-4 flex flex-col gap-1 items-end">
+          {errors.root?.importe && (
+            <span className="text-red-600 text-sm self-start">
+              {errors.root.importe.message}
+            </span>
+          )}
           <span>Total materiales: {totalMateriales.toFixed(2)} €</span>
-          <span>Mano de obra: {(Number(manoDeObra) || 0).toFixed(2)} €</span>
+          <span>Mano de obra: {manoDeObra.toFixed(2)} €</span>
           <span>Base imponible: {baseImponible.toFixed(2)} €</span>
           <span>IVA ({iva}%): {(total - baseImponible).toFixed(2)} €</span>
           <span className="font-bold text-lg">Total: {total.toFixed(2)}

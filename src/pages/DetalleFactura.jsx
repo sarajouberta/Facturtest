@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useFactura, useConfig, borrarFactura } from '../datos'
 
 import FacturaPDF from '../components/FacturaPDF'
+import { calcularManoDeObra } from '../utils/calculos'
 import { useRef } from 'react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas-pro'
@@ -137,6 +138,37 @@ function DetalleFactura() {
                     ))}
                 </tbody>
             </table>
+
+            {/* Mano de obra desglosada (solo facturas nuevas) */}
+            {factura.lineasManoDeObra?.length > 0 && (
+                <table className="w-full mb-4 text-sm">
+                    <thead>
+                        <tr className="border-b text-left">
+                            <th className="py-1">Mano de obra</th>
+                            <th className="py-1 text-right">Tiempo</th>
+                            <th className="py-1 text-right">€/hora</th>
+                            <th className="py-1 text-right">Importe</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {factura.lineasManoDeObra.map((l, i) => (
+                            <tr key={i} className="border-b">
+                                <td className="py-1">{l.descripcion}</td>
+                                <td className="py-1 text-right">
+                                    {((Number(l.tiempo) || 0) / 100).toLocaleString('es-ES')} h
+                                </td>
+                                <td className="py-1 text-right">
+                                    {(Number(l.precioHora) || 0).toFixed(2)} €
+                                </td>
+                                <td className="py-1 text-right">
+                                    {calcularManoDeObra(l.tiempo, l.precioHora).toFixed(2)} €
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+
             {/* Totales */}
             <div className="flex flex-col items-end gap-1 mb-6">
                 <span>Total materiales: {totalMateriales.toFixed(2)} €</span>
