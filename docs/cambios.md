@@ -5,6 +5,103 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-07 — Mano de obra desglosada por tareas
+
+Petición del titular del taller tras la **tercera ronda de revisión** de la app: poder fijar el
+**precio de la hora** en la configuración y que se rellene solo en cada factura, igual que el
+número y el IVA.
+
+### El modelo: una línea por tarea, no un importe suelto
+
+Hasta ahora la mano de obra era **un único campo en euros**, tecleado a mano. "Precio por hora"
+es una **tarifa**, no un importe: a 20 €/h, una reparación de tres horas son 60 €, así que
+prerrellenar el campo con 20 habría dado una cifra incorrecta salvo que el trabajo durase
+exactamente una hora. Se pasa a un **desglose por líneas**:
+
+```js
+lineasManoDeObra: [ { descripcion, tiempo, precioHora } ]
+manoDeObra   // el total en €, ya calculado
+```
+
+- **El tiempo va en centésimas de hora**, que es la notación del taller: `100` = 1 h, `50` =
+  media, `25` = cuarto. Se guarda así porque es como él lo apunta; obligarle a escribir `1,5`
+  sería que él se adapte a la app, cuando el objetivo es el contrario.
+- **La tarifa vive en cada línea**, no se lee de la configuración al mostrar la factura. Si
+  mañana sube la hora a 25 €, las facturas viejas **no pueden cambiar solas**. Por lo mismo se
+  guarda también el importe ya calculado. Y permite cobrar distinto un trabajo especializado.
+- La configuración solo aporta el **valor por defecto**: la línea nace con la tarifa puesta,
+  pero el campo sigue siendo editable.
+
+### Cálculo (`utils/calculos.js`)
+- `calcularManoDeObra(tiempo, precioHora)` → `(tiempo / 100) * precioHora`, por línea.
+- `calcularTotalManoDeObra(lineas)` → suma cada línea con **su** tarifa. No vale multiplicar un
+  tiempo total por una tarifa única.
+- Tests: de 46 a **69**, incluidos los que blindan la conversión rara (`50 → media hora`,
+  `25 → cuarto`) y el caso de la lista inexistente, que es el de las facturas antiguas.
+
+### Fallos encontrados por el camino
+
+- **Las dos secciones compartían estado.** El desglose se había empezado copiando el bloque de
+  Materiales, y ambas usaban el **mismo** `useFieldArray` y los mismos nombres de campo. No eran
+  dos listas: era la misma pintada dos veces (escribir arriba aparecía abajo, la ✕ borraba de
+  las dos). Se arregla con un segundo `useFieldArray` (`name: 'lineasManoDeObra'`), renombrando
+  al desestructurar (`fields: fieldsManoDeObra`…) porque los nombres cortos ya estaban ocupados.
+- **`ReferenceError` al guardar.** En `crearFactura` se pasaba `precioManoDeObra`, que no existía
+  como variable: solo aparecía como **cadena** dentro de un `register(...)`. Los nombres de campo
+  de React Hook Form son texto, no variables, y el linter no los revisa. Se activó **`no-undef`**
+  en `.oxlintrc.json` para que estos casos salten en `npm run lint`.
+- **La fecha se podía dejar vacía** (el valor por defecto solo rellena, no impide borrar) → ahora
+  es `required`.
+- **La fecha por defecto se calculaba en UTC.** `new Date().toISOString()` daba el **día
+  anterior** entre medianoche y las 2:00 en horario español. Se cambia por
+  `toLocaleDateString('sv-SE')`, el único locale estándar que da `AAAA-MM-DD` —el formato que
+  necesita `<input type="date">`— pero en la zona horaria del dispositivo.
+- **El efecto de valores sugeridos se repetía.** Se dispara con cada cambio de `facturas` o
+  `config`, y ambos llegan por `onSnapshot`: una factura guardada desde el móvil podía
+  **sobrescribir** el número o el IVA que se estuviera escribiendo. Ahora se aplica una sola vez
+  con una bandera en `useRef` (no `useState`: cambiarla no debe repintar).
+
+### Formularios más claros
+- **Cabecera de columnas** en Materiales y en Mano de obra. Los *placeholders* desaparecen al
+  escribir, así que sin títulos quedaban casillas sin nombre — y con la notación de centésimas
+  eso era directamente indescifrable. Importe por línea en vivo, en ambas secciones.
+- **El campo de tiempo es de texto**, no `type="number"`: sin *spinner*, y validado por nosotros
+  con `pattern: /^\d*$/` (enteros, sin decimales). `inputMode="numeric"` mantiene el teclado
+  numérico en el móvil. Un `type="number"` con `step` rechazaba valores como `33`.
+- **El precio de material arranca vacío**, no a `0`. Ese `0` era el valor real del campo y había
+  que borrarlo para escribir encima (en julio se paliaba seleccionando al enfocar).
+- Campos obligatorios **en negrita**, además del asterisco.
+
+### `NaN`, el tema recurrente
+`valueAsNumber` devuelve **`NaN`** —no `0` ni `undefined`— cuando un campo numérico está vacío, y
+un `??` no lo caza. Se ataja en tres capas: `Number(x) || 0` al calcular, `Number.isFinite(x)` al
+leer la configuración, y una **normalización en `onSubmit`** que convierte a número antes de
+escribir en Firestore, para que el dato guardado no quede sucio.
+
+### Aviso de configuración incompleta
+La configuración **envejece**: al añadir campos nuevos, las configuraciones ya guardadas se
+quedan sin ellos y el onboarding no lo detecta (solo salta cuando *no hay* configuración). Con la
+tarifa vacía, las líneas nacían a `0` sin avisar.
+
+- `utils/configuracion.js`: `clavesConfigPendientes` y `camposConfigPendientes`, funciones puras
+  con tests. Un `0` **no** cuenta como hueco (un IVA del 0 % es válido); `NaN`, `null` y `''` sí.
+  Ambas salen de la misma lista, así que el aviso y el campo señalado no pueden contradecirse.
+- Aviso en **Nueva factura** (donde el hueco hace daño) y en **Configuración**, con los campos
+  que faltan **en rojo**. Informa pero **no bloquea**: obligar a rellenar un campo que antes no
+  existía sería castigar al usuario por un cambio nuestro.
+- Confirmación **en página** al guardar (verde, en el sitio del aviso amarillo), además del
+  `alert` de siempre.
+
+### Documentación y limpieza
+- README de verdad (era la plantilla de Vite), `lang="es"` en `index.html`, fuera Dexie de
+  `package.json` (ya no lo importaba nadie) y los assets muertos. Quitar Dexie **no reduce el
+  bundle**: Vite ya lo descartaba por *tree-shaking*; la ganancia es de repo, no de rendimiento.
+- `tecnologias.md` al día: modelo de datos con `lineasManoDeObra` y la política de
+  **no migrar nunca** las facturas antiguas (se detecta la ausencia del campo y se muestra lo
+  que haya).
+
+---
+
 ## 2026-08-06 — Reglas de seguridad de Firestore (Fase 5)
 
 La base llevaba desde el 13 de julio **en modo de prueba**, es decir, abierta. Se cierra.
@@ -74,10 +171,13 @@ POST …/users/xyz/facturas                                                     
 Las tres devuelven `PERMISSION_DENIED`. **Con las reglas viejas, estas mismas peticiones habrían
 devuelto los datos.** Mejor prueba que el *Rules Playground* de la consola, que solo simula.
 
+**3. Que aíslan a un usuario de otro (segunda cuenta de Google).** La prueba 2 solo cubre
+`request.auth != null`; para la otra mitad de la condición (`request.auth.uid == uid`) hace
+falta un token real de otra cuenta. Al entrar con una segunda cuenta, la app muestra el
+**onboarding de primer uso** — es decir, esa cuenta cae en **su propia rama, vacía**, sin ver ni
+las facturas ni la configuración de la primera. Las dos mitades de la regla quedan verificadas.
+
 ### Pendiente
-- Falta comprobar la segunda mitad de la condición (`request.auth.uid == uid`): que un usuario
-  **logueado** tampoco entre en la rama de otro. Requiere una segunda cuenta de Google; al
-  entrar debe ver **la lista vacía**, no las facturas de la primera.
 - **Emulator Suite** (`firebase-tools` + `@firebase/rules-unit-testing`): permitiría convertir
   estas comprobaciones en **tests automáticos de las reglas**, ejecutables junto a los de
   Vitest. Queda en mejoras futuras. Nota: el emulador prueba el **archivo local**, no lo
@@ -88,11 +188,12 @@ devuelto los datos.** Mejor prueba que el *Rules Playground* de la consola, que 
 
 ---
 
-## 2026-08-06 — El service worker secuestraba el login (cierre del arreglo de julio)
+## 2026-08-06 — El login en el móvil: tres fallos encadenados
 
 El arreglo del 27 de julio (redirección + proxy) se había subido pero **nunca se llegó a
-verificar en el móvil**. Al comprobarlo aparecieron **dos fallos encadenados**: uno de
-despliegue y otro de la propia PWA.
+verificar en el móvil**. Al comprobarlo aparecieron **tres fallos encadenados**: uno de
+despliegue, uno de la propia PWA y uno de configuración de Google Cloud. Cada uno tapaba al
+siguiente, así que solo se veían de uno en uno.
 
 ### Fallo 1: el `authDomain` nuevo no estaba en producción
 
@@ -154,6 +255,50 @@ a Firebase. Explicación conceptual de service worker y Workbox en `tecnologias.
 - `/__/auth/handler` devuelve el HTML del manejador de Firebase (con `handler.js`), no el
   `index.html` de la app.
 - `sw.js` de producción contiene `denylist:[/^\/__\/auth\//]`.
+
+### Fallo 3: Google no conocía el dominio nuevo (`Error 400: redirect_uri_mismatch`)
+
+Con el service worker ya fuera de en medio, la redirección **sí llegó a Google**… y Google la
+paró en seco: pantalla de **"Acceso bloqueado"**, `Error 400: redirect_uri_mismatch`.
+
+- *Causa:* al pasar el `authDomain` al dominio propio, la URL de retorno del login pasó a ser
+  `https://facturtest.vercel.app/__/auth/handler`. Google solo acepta volver a direcciones
+  **declaradas de antemano** en el cliente OAuth, y ahí solo estaba la que Firebase registra
+  sola (`…firebaseapp.com/__/auth/handler`). **Firebase no sabe nada del dominio de Vercel.**
+- *Arreglo:* Google Cloud Console (mismo proyecto `facturtest-6b96e`) → **APIs y servicios →
+  Credenciales** → cliente *Web client (auto created by Google Service)*, y añadir:
+  - **Orígenes autorizados de JavaScript:** `https://facturtest.vercel.app` (sin ruta)
+  - **URIs de redireccionamiento autorizados:** `https://facturtest.vercel.app/__/auth/handler`
+- *Distinción entre los dos campos:* el **origen** es desde qué web se permite **arrancar** el
+  login; el **URI de redireccionamiento**, a qué dirección exacta se permite **volver** con el
+  resultado. El proxy cambió las dos cosas a la vez.
+- *Detalle que costó tiempo:* el proyecto **no aparecía** en Google Cloud. No era un problema de
+  permisos: el selector solo muestra los proyectos de la **cuenta de Google activa**, y el
+  navegador se había quedado con la segunda cuenta usada para probar el aislamiento de
+  Firestore. Atajo para saltarse el selector:
+  `console.cloud.google.com/apis/credentials?project=facturtest-6b96e`.
+- Google avisa de que estos cambios **tardan en propagarse** (de minutos a horas). Un fallo
+  inmediato tras guardar no significa que esté mal puesto.
+
+### El mapa completo: mover el login al dominio propio toca TRES sitios
+
+Esta es la lección de la sesión. El arreglo de julio hizo dos de los tres y por eso quedó a
+medias:
+
+| Dónde | Qué se declara | Estado |
+|---|---|---|
+| `vercel.json` | El proxy `/__/auth/*` → proyecto de Firebase | ✅ 27/07 |
+| Firebase → Authentication → **Authorized domains** | Que el dominio puede usar Firebase Auth | ✅ 27/07 |
+| Google Cloud → **Credenciales → cliente OAuth** | Origen y URI de retorno permitidos por Google | ✅ 06/08 |
+
+Y a esos tres hay que sumar los dos de dentro de la app, que también hablan de rutas: la
+variable `VITE_FIREBASE_AUTH_DOMAIN` (Vercel) y la `navigateFallbackDenylist` del service
+worker. **Cinco sitios en total** para una sola decisión de arquitectura.
+
+### Resultado
+
+**Login verificado en el móvil real (PWA instalada): entra correctamente.** Queda cerrado el
+arreglo que se abrió el 27/07 y con él la sincronización multi-dispositivo, que era su motivo.
 
 ### Nota operativa
 Tras cambiar la configuración de la PWA hay que **desinstalar y reinstalar la app en el móvil**.

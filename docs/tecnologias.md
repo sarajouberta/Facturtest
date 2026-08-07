@@ -303,7 +303,8 @@ las reglas de arriba.
   vehiculo: { modelo, vehiculo, matricula, km },
   trabajos,                                          // texto libre
   conceptos: [ { descripcion, cantidad, precioUnitario } ],  // "materiales"
-  manoDeObra,                                        // importe en €
+  lineasManoDeObra: [ { descripcion, tiempo, precioHora } ], // una tarea por línea
+  manoDeObra,        // importe total en € de esas líneas, ya calculado
   iva,
   totalMateriales,   // suma de los materiales
   baseImponible,     // = totalMateriales + manoDeObra
@@ -311,17 +312,32 @@ las reglas de arriba.
 }
 ```
 
-**Configuración del taller** (registro único, `id: 1`)
+**El `tiempo` va en centésimas de hora**, que es como lo apunta el taller: `100` = 1 h,
+`50` = media, `25` = cuarto. Se guarda en esa notación y se **imprime en horas** en el PDF,
+porque quien lo lee es el cliente: "1,5 h" se entiende y "150" no.
+
+**Configuración del taller** (documento único, `users/{uid}/config/taller`)
 ```js
-{ id: 1, nombre, titular, nif, actividad, direccion, telefono, logo }
+{ nombre, titular, nif, actividad, direccion, telefono, logo,
+  numeroInicial, precioManoDeObra, iva }   // los tres últimos, valores por defecto
 ```
 
 Decisiones de diseño:
-- Se guardan `totalMateriales`, `baseImponible` y `total` en la factura (documento legal "congelado").
-- Número de factura automático correlativo (`F-2026-001`) con opción a editar.
+- Se guardan `totalMateriales`, `manoDeObra`, `baseImponible` y `total` en la factura
+  (documento legal "congelado").
+- **La tarifa se guarda en cada línea**, no se lee de la configuración al mostrar. Si mañana
+  sube el precio de la hora, las facturas viejas no pueden cambiar solas. Por el mismo motivo
+  se guarda el importe ya calculado además de las líneas.
+- Número de factura correlativo (solo dígitos), con número inicial configurable y editable.
 - Cálculo: `base = materiales + mano de obra`; el IVA se aplica sobre la base.
 - Modelo ampliado tras analizar la factura de papel real del taller (vehículo, mano de
   obra separada, cliente completo, trabajos realizados).
+
+**Compatibilidad hacia atrás.** Las facturas creadas antes de un cambio de modelo **no se
+migran nunca**: se detecta la ausencia del campo y se muestra lo que haya. Por eso el desglose
+de mano de obra va bajo `factura.lineasManoDeObra?.length > 0`, y las facturas antiguas siguen
+enseñando su cifra única de `manoDeObra`. Misma razón de los `?? 0` de `DetalleFactura` y
+`FacturaPDF`.
 
 ## Arquitectura de datos: una rama por usuario, en la nube
 
@@ -528,6 +544,29 @@ dentro del navegador — arreglar solo `vercel.json` no basta. Ver *PWA*.
 
 Nota: JSON no admite comentarios (`//` o `/* */` rompen el archivo); por eso las
 explicaciones de configuración van aquí, en la documentación, y no dentro del `.json`.
+
+### El login con Google en producción se declara en cinco sitios
+
+En local basta con el popup y no hay que configurar nada. En producción, en cambio, la app va
+instalada como PWA y el login usa **redirección desde el dominio propio** (para no depender de
+cookies de terceros). Esa decisión se declara, por separado, en cinco lugares — y **si falta
+uno, el login se rompe de una forma distinta cada vez** (ver la crónica en `cambios.md`):
+
+| Dónde | Qué se declara | Si falta… |
+|---|---|---|
+| `vercel.json` | El proxy `/__/auth/*` hacia el proyecto de Firebase | La ruta de login no existe en tu dominio |
+| `VITE_FIREBASE_AUTH_DOMAIN` (Vercel) | Que Firebase use tu dominio, no `firebaseapp.com` | El proxy no se usa; vuelve el problema de cookies |
+| `navigateFallbackDenylist` (`vite.config.js`) | Que el service worker no intercepte `/__/auth/*` | "Cargando…" eterno: nunca se llega a Google |
+| Firebase → Auth → **Authorized domains** | Que el dominio puede usar Firebase Auth | Firebase rechaza la operación |
+| Google Cloud → **Credenciales → cliente OAuth** | Origen y URI de retorno permitidos | Google: `Error 400: redirect_uri_mismatch` |
+
+Los tres primeros viven en el repo; los dos últimos, solo en consolas web. **Ojo con esos dos:
+no están bajo control de versiones y no hay forma de saber desde el código si están puestos.**
+Es la parte del despliegue que hay que documentar sí o sí, porque no se deduce de ningún lado.
+
+Detalle práctico: los proyectos de Firebase **son** proyectos de Google Cloud, pero la consola
+de Cloud solo lista los de la **cuenta de Google activa**. Enlace directo saltándose el
+selector: `console.cloud.google.com/apis/credentials?project=PROJECT_ID`.
 
 ## Mejoras futuras / pendiente
 
