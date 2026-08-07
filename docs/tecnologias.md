@@ -313,8 +313,10 @@ las reglas de arriba.
 ```
 
 **El `tiempo` va en centésimas de hora**, que es como lo apunta el taller: `100` = 1 h,
-`50` = media, `25` = cuarto. Se guarda en esa notación y se **imprime en horas** en el PDF,
-porque quien lo lee es el cliente: "1,5 h" se entiende y "150" no.
+`50` = media, `25` = cuarto. **Se guarda así y se muestra en horas con dos decimales**
+(`80` → `0,80`), que es el formato estándar del sector: se comprobó en una factura de
+concesionario, donde `0,80 × 46,50 € = 37,20 €`. La conversión está aislada en
+`utils/formato.js` (`tiempoEnHoras`), con tests.
 
 **Configuración del taller** (documento único, `users/{uid}/config/taller`)
 ```js

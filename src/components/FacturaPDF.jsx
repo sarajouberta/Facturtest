@@ -1,13 +1,7 @@
 /*Nota: usa estilos en línea (style={{...}}) con colores hex, no Tailwind, para
   que la captura salga fiel y sin sustos*/
 import { calcularManoDeObra } from '../utils/calculos'
-
-/* El tiempo se guarda en centésimas de hora (100 = 1 h), que es como lo apunta
-   el taller. En el PDF se imprime en horas, porque quien lo lee es el cliente:
-   "1,5 h" se entiende y "150" no. */
-function tiempoEnHoras(tiempo) {
-    return (Number(tiempo) || 0) / 100
-}
+import { tiempoEnHoras } from '../utils/formato'
 
 function FacturaPDF({ factura, config }) {
     if (!factura) return null
@@ -103,7 +97,9 @@ function FacturaPDF({ factura, config }) {
                 </div>
             )}
 
-            {/* Materiales */}
+            {/* Materiales. Solo si hay: una factura de solo mano de obra es
+                válida, y en ella esta tabla saldría como una cabecera suelta. */}
+            {factura.conceptos?.length > 0 && (
             <table style={{
                 width: '100%', borderCollapse: 'collapse', marginTop:
                     '12px'
@@ -131,6 +127,7 @@ function FacturaPDF({ factura, config }) {
                     ))}
                 </tbody>
             </table>
+            )}
 
             {/* Mano de obra desglosada. Solo las facturas nuevas llevan líneas;
                 las antiguas guardaban un único importe y no entran aquí. */}
@@ -140,23 +137,23 @@ function FacturaPDF({ factura, config }) {
                 }}>
                     <thead>
                         <tr>
-                            <th style={{ ...th, width: '70px', textAlign: 'right' }}>Tiempo</th>
                             <th style={th}>Mano de obra</th>
+                            <th style={{ ...th, width: '70px', textAlign: 'right' }}>Cantidad</th>
                             <th style={{ ...th, width: '90px', textAlign: 'right' }}>Importe</th>
                         </tr>
                     </thead>
                     <tbody>
                         {factura.lineasManoDeObra.map((l, i) => (
                             <tr key={i}>
-                                <td style={{ ...td, textAlign: 'right' }}>
-                                    {tiempoEnHoras(l.tiempo).toLocaleString('es-ES')} h
-                                </td>
                                 <td style={td}>
                                     {l.descripcion}
                                     {' '}
                                     <span style={{ color: '#6b7280' }}>
-                                        ({(Number(l.precioHora) || 0).toFixed(2)} €/h)
+                                        ({(Number(l.precioHora) || 0).toFixed(2)} €)
                                     </span>
+                                </td>
+                                <td style={{ ...td, textAlign: 'right' }}>
+                                    {tiempoEnHoras(l.tiempo)}
                                 </td>
                                 <td style={{ ...td, textAlign: 'right' }}>
                                     {calcularManoDeObra(l.tiempo, l.precioHora).toFixed(2)} €
@@ -181,23 +178,23 @@ function FacturaPDF({ factura, config }) {
                             }}>{totalMateriales.toFixed(2)} €</td>
                         </tr>
                         <tr>
-                            <td style={td}>Mano de obra</td>
+                            <td style={td}>Total mano de obra</td>
                             <td style={{ ...td, textAlign: 'right' }}>{manoDeObra.toFixed(2)}
                                 €</td>
                         </tr>
                         <tr>
-                            <td style={td}>Suma</td>
+                            <td style={td}>Base imponible</td>
                             <td style={{
                                 ...td, textAlign: 'right'
                             }}>{baseImponible.toFixed(2)} €</td>
                         </tr>
                         <tr>
-                            <td style={td}>I.V.A. ({factura.iva}%)</td>
+                            <td style={td}>IVA ({factura.iva}%)</td>
                             <td style={{ ...td, textAlign: 'right' }}>{ivaImporte.toFixed(2)}
                                 €</td>
                         </tr>
                         <tr>
-                            <td style={{ ...td, fontWeight: 'bold' }}>TOTAL EUROS</td>
+                            <td style={{ ...td, fontWeight: 'bold' }}>TOTAL</td>
                             <td style={{
                                 ...td, textAlign: 'right', fontWeight: 'bold'
                             }}>{total.toFixed(2)} €</td>

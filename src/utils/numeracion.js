@@ -12,3 +12,19 @@ export function generarSiguienteNumero(facturas, numeroInicial = 1) {
     const inicial = Number(numeroInicial) || 1
     return String(Math.max(maxUsado + 1, inicial))
 }
+
+/* ¿Ese número ya está usado por otra factura?
+   El número se sugiere solo, pero el campo es editable: sin esta comprobación se
+   pueden emitir dos facturas con el mismo número, y la numeración correlativa sin
+   duplicados es un requisito legal.
+   - Se compara como texto normalizado, para que convivan los números guardados como
+     número (46) y como texto ('46'), y también los del formato antiguo ('F-2026-001').
+   - `idActual` permite excluir la propia factura, para cuando se pueda editar una ya
+     creada: si no, se detectaría a sí misma como duplicada. */
+export function numeroYaUsado(facturas, numero, idActual = null) {
+    const buscado = String(numero ?? '').trim()
+    if (buscado === '') return false
+    return (facturas ?? []).some(
+        (f) => f.id !== idActual && String(f.numero ?? '').trim() === buscado,
+    )
+}

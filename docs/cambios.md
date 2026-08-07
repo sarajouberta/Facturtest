@@ -25,7 +25,14 @@ manoDeObra   // el total en €, ya calculado
 
 - **El tiempo va en centésimas de hora**, que es la notación del taller: `100` = 1 h, `50` =
   media, `25` = cuarto. Se guarda así porque es como él lo apunta; obligarle a escribir `1,5`
-  sería que él se adapte a la app, cuando el objetivo es el contrario.
+  sería que él se adapte a la app, cuando el objetivo es el contrario. **Se muestra en horas
+  con dos decimales** (`80` → `0,80`), que es el formato del sector: se verificó contra una
+  factura de concesionario, donde la columna *Cantidad* dice `0,80` y `0,80 × 46,50 € = 37,20 €`.
+  Es el mismo dato dividido entre 100. La conversión vive en `utils/formato.js`, con tests.
+  *(Esto dio dos vueltas: primero se convertía a horas, luego se quitó al entender que la
+  notación en centésimas también valía para el cliente, y finalmente se recuperó al ver una
+  factura real. La lección: preguntar por el dato concreto —cómo se escribe vs. cómo se
+  imprime— y contrastarlo con un documento de verdad.)*
 - **La tarifa vive en cada línea**, no se lee de la configuración al mostrar la factura. Si
   mañana sube la hora a 25 €, las facturas viejas **no pueden cambiar solas**. Por lo mismo se
   guarda también el importe ya calculado. Y permite cobrar distinto un trabajo especializado.
@@ -50,6 +57,13 @@ manoDeObra   // el total en €, ya calculado
   como variable: solo aparecía como **cadena** dentro de un `register(...)`. Los nombres de campo
   de React Hook Form son texto, no variables, y el linter no los revisa. Se activó **`no-undef`**
   en `.oxlintrc.json` para que estos casos salten en `npm run lint`.
+- **Se podían emitir dos facturas con el mismo número.** El número se sugiere solo
+  (`generarSiguienteNumero`), lo que evita el duplicado en el flujo normal, pero el campo es
+  editable y no había **comprobación**: bastaba con corregirlo a mano. La numeración correlativa
+  sin duplicados es un requisito legal. Nueva función pura `numeroYaUsado(facturas, numero,
+  idActual)`, enganchada como `validate` del campo. Compara como texto normalizado, porque los
+  números conviven guardados como número y como texto según cuándo se creó la factura; y admite
+  excluir la propia factura, de cara a poder editarlas en el futuro.
 - **La fecha se podía dejar vacía** (el valor por defecto solo rellena, no impide borrar) → ahora
   es `required`.
 - **La fecha por defecto se calculaba en UTC.** `new Date().toISOString()` daba el **día
@@ -75,8 +89,35 @@ manoDeObra   // el total en €, ya calculado
 ### `NaN`, el tema recurrente
 `valueAsNumber` devuelve **`NaN`** —no `0` ni `undefined`— cuando un campo numérico está vacío, y
 un `??` no lo caza. Se ataja en tres capas: `Number(x) || 0` al calcular, `Number.isFinite(x)` al
-leer la configuración, y una **normalización en `onSubmit`** que convierte a número antes de
-escribir en Firestore, para que el dato guardado no quede sucio.
+leer la configuración, y una **normalización antes de guardar** (`utils/lineas.js`), para que el
+dato escrito en Firestore no quede sucio.
+
+### Líneas vacías (`utils/lineas.js`)
+El formulario arranca siempre con una línea de cada tipo. Si no se rellenaba ni se borraba, se
+guardaba tal cual y salía en la factura como una **fila en blanco con importes a 0** — fue lo que
+despistó al revisar una factura de prueba antigua.
+
+`limpiarConceptos` y `limpiarLineasManoDeObra` normalizan los números y **descartan las líneas
+vacías** antes de guardar. Qué cuenta como vacía:
+
+- **Material:** sin descripción **ni** precio. La *cantidad* no sirve de señal: viene con un `1`
+  por defecto que no significa que nadie haya escrito nada.
+- **Mano de obra:** sin tarea **ni** tiempo. La *tarifa* tampoco sirve de señal: desde este
+  cambio la línea nace con el precio de la configuración ya puesto, así que usarla habría
+  impedido descartar ninguna.
+
+Los totales se calculan ya sobre las líneas limpias, que son las que se guardan, para que lo
+mostrado y lo almacenado no puedan divergir. La normalización, que antes estaba suelta dentro de
+`onSubmit`, queda aquí **con tests**.
+
+### Tablas que solo aparecen si tienen contenido
+La tabla de materiales se pintaba **siempre**, mientras que la de mano de obra ya iba condicionada.
+En una factura de solo mano de obra —perfectamente válida— eso dejaba una cabecera suelta sin
+filas. Ahora ambas van bajo `?.length > 0`.
+
+Conviene no confundirlo con la regla de negocio: **una impide guardar** una factura que no sume
+nada; **la otra impide enseñar** una tabla sin contenido en una factura correcta. Son
+complementarias.
 
 ### Aviso de configuración incompleta
 La configuración **envejece**: al añadir campos nuevos, las configuraciones ya guardadas se

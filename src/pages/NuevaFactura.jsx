@@ -3,10 +3,11 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { useNavigate, Link } from 'react-router-dom'
 import { useFacturas, useConfig, crearFactura } from '../datos'
 
-import { generarSiguienteNumero } from '../utils/numeracion'
+import { generarSiguienteNumero, numeroYaUsado } from '../utils/numeracion'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import { matriculaParaGuardar } from '../utils/matricula'
 import { buscarPorMatricula } from '../utils/busqueda'
+import { limpiarConceptos, limpiarLineasManoDeObra } from '../utils/lineas'
 import { camposConfigPendientes } from '../utils/configuracion'
 import {
   calcularTotalMateriales,
@@ -133,9 +134,16 @@ function NuevaFactura() {
   }
 
   const onSubmit = async (datos) => {
+    /* Primero se limpian las líneas: se normalizan los números y se descartan las
+       que estén vacías (el formulario arranca con una de cada tipo, y si no se
+       rellenan acababan guardadas como filas en blanco). Los totales se calculan
+       ya sobre lo limpio, que es lo que se va a guardar. */
+    const conceptos = limpiarConceptos(datos.conceptos)
+    const lineasManoDeObra = limpiarLineasManoDeObra(datos.lineasManoDeObra)
+
     // Recalculamos y "congelamos" los importes al guardar
-    const totalMateriales = calcularTotalMateriales(datos.conceptos)
-    const manoDeObra = calcularTotalManoDeObra(datos.lineasManoDeObra)
+    const totalMateriales = calcularTotalMateriales(conceptos)
+    const manoDeObra = calcularTotalManoDeObra(lineasManoDeObra)
     const baseImponible = calcularBaseImponible(totalMateriales, manoDeObra)
     const total = calcularTotal(baseImponible, datos.iva)
 
@@ -155,24 +163,6 @@ function NuevaFactura() {
     // La matrícula se guarda normalizada (MAYÚSCULAS y pegada, p. ej. 1234ABC),
     // así en la factura sale siempre uniforme, teclee como teclee.
     const matricula = matriculaParaGuardar(datos.vehiculo?.matricula)
-
-    /* El tiempo se teclea en un campo de texto, así que llega como cadena
-       ('100'). Se convierte a número antes de guardar: en la base de datos debe
-       ser un número, no texto. Los cálculos ya lo toleraban, pero el dato no
-       tiene por qué quedar sucio. */
-    const lineasManoDeObra = (datos.lineasManoDeObra ?? []).map((linea) => ({
-      ...linea,
-      tiempo: Number(linea.tiempo) || 0,
-    }))
-
-    /* Igual con los materiales: un campo numérico en blanco deja NaN (es lo que
-       devuelve valueAsNumber), y NaN no debe llegar a la base de datos. Los
-       cálculos ya lo toleran, pero el dato guardado tiene que estar limpio. */
-    const conceptos = (datos.conceptos ?? []).map((concepto) => ({
-      ...concepto,
-      cantidad: Number(concepto.cantidad) || 0,
-      precioUnitario: Number(concepto.precioUnitario) || 0,
-    }))
 
     try {
       await crearFactura({
@@ -220,7 +210,13 @@ function NuevaFactura() {
           <label className="flex flex-col gap-1">
             <span className="text-sm font-bold">Número *</span>
             <input type="number" min="1" className="border rounded px-3 py-2"
-              {...register('numero', { required: 'El número es obligatorio' })}
+              {...register('numero', {
+                required: 'El número es obligatorio',
+                // El número se sugiere solo, pero es editable: hay que comprobar
+                // que no se repita. Dos facturas con el mismo número no son válidas.
+                validate: (valor) =>
+                  !numeroYaUsado(facturas, valor) || 'Ya existe una factura con ese número',
+              })}
             />
             {errors.numero && (
               <span className="text-red-600 text-sm">{errors.numero.message}</span>
@@ -493,10 +489,10 @@ function NuevaFactura() {
             </span>
           )}
           <span>Total materiales: {totalMateriales.toFixed(2)} €</span>
-          <span>Mano de obra: {manoDeObra.toFixed(2)} €</span>
+          <span>Total mano de obra: {manoDeObra.toFixed(2)} €</span>
           <span>Base imponible: {baseImponible.toFixed(2)} €</span>
           <span>IVA ({iva}%): {(total - baseImponible).toFixed(2)} €</span>
-          <span className="font-bold text-lg">Total: {total.toFixed(2)}
+          <span className="font-bold text-lg">TOTAL: {total.toFixed(2)}
             €</span>
         </div>
 
