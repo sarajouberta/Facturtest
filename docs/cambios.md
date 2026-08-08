@@ -5,6 +5,71 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-08 — Entrada de números a prueba de errores
+
+Repaso de todos los campos numéricos de la app tras detectar que **`type="number"` no era de
+fiar** para importes.
+
+### El problema de `type="number"` con la coma
+Con `type="number"`, un valor escrito con **coma decimal** puede dejar el campo **vacío** según
+el navegador y su configuración regional. Entonces `valueAsNumber` devuelve `NaN` y el importe
+se guarda como **0 sin avisar de nada**. En un precio, eso es una factura mal emitida.
+
+Además, la comprobación de decimales la hacía el navegador vía `step="0.01"`: mensaje en su
+idioma, en un globo del sistema, sin poder darle estilo ni encajarlo con el resto de avisos.
+
+**Solución, la misma en los cuatro campos** (precio de material, €/hora de la línea, horas, y el
+precio de mano de obra de Configuración):
+
+```jsx
+<input type="text" inputMode="decimal"
+  {...register(campo, {
+    pattern: { value: /^\d*([.,]\d{1,2})?$/, message: '…p. ej. 46,50 (máximo 2 decimales)' },
+  })} />
+```
+
+- **Coma o punto, indistintamente.** La conversión la hace `numeroDesdeTexto`, necesaria porque
+  `Number('46,50')` es `NaN`: JavaScript solo entiende el punto.
+- **La regla es nuestra**, así que el mensaje sale en rojo bajo la línea, como los demás.
+- `inputMode="decimal"` mantiene el teclado numérico en el móvil, que era lo único bueno que
+  aportaba `type="number"`.
+- **Km** también se valida (solo dígitos, opcional): antes admitía cualquier texto y se imprimía
+  tal cual en la factura.
+
+### Validar antes de convertir, no al revés
+La conversión se intentó primero con **`setValueAs`**, que parece lo natural. Está mal:
+`setValueAs` se ejecuta **antes** de la validación, así que el `pattern` habría recibido un
+número ya convertido — escribir `hola` daría `0`, y `0` encaja con el patrón. **La validación no
+habría rechazado nunca nada, en silencio.** La conversión va en `onSubmit`: se valida lo que el
+usuario escribió y se convierte después.
+
+### `null` no es `0`
+Al vaciar la tarifa en Configuración y guardar, **no saltaba el aviso de campo pendiente**. Dos
+causas encadenadas:
+
+1. `numeroDesdeTexto('')` devuelve `0`, así que un campo vaciado se guardaba como un **cero
+   válido**. Ahora un campo vacío se guarda como **`null`**: "no hay tarifa" y "la tarifa vale
+   cero" son cosas distintas.
+2. `estaVacio` trataba el `0` como valor legítimo. Lo era **para el IVA** (un 0 % es real), no
+   para una tarifa. Se añade la marca `ceroEsVacio` al campo concreto.
+
+*Lección:* una decisión correcta puede volverse en contra al cambiar el contexto. La regla "el 0
+es un valor válido" se escribió pensando en el IVA y solo valía para la mitad de los campos; el
+fallo se destapó al pasar el campo de numérico a texto, porque el vacío dejó de ser `NaN`
+(detectado) y pasó a ser `0` (no detectado).
+
+### Detalles de presentación
+- La tarifa guardada se **formatea al reabrir** Configuración (`46,50`, no `46.5`), con
+  `formatearDecimal`. Hay un test de **ida y vuelta** —`numeroDesdeTexto(formatearDecimal(x)) === x`—
+  que fija que las dos funciones son inversas: sin eso, abrir y volver a guardar podría degradar
+  el número.
+- Si no hay tarifa, el campo queda **vacío** (con su placeholder), no a `0,00`: un `0,00` parece
+  un dato real y además ocultaría el aviso de campo pendiente.
+
+Tests: de 89 a **107**.
+
+---
+
 ## 2026-08-07 — Mano de obra desglosada por tareas
 
 Petición del titular del taller tras la **tercera ronda de revisión** de la app: poder fijar el
@@ -19,20 +84,23 @@ prerrellenar el campo con 20 habría dado una cifra incorrecta salvo que el trab
 exactamente una hora. Se pasa a un **desglose por líneas**:
 
 ```js
-lineasManoDeObra: [ { descripcion, tiempo, precioHora } ]
+lineasManoDeObra: [ { descripcion, horas, precioHora } ]
 manoDeObra   // el total en €, ya calculado
 ```
 
-- **El tiempo va en centésimas de hora**, que es la notación del taller: `100` = 1 h, `50` =
-  media, `25` = cuarto. Se guarda así porque es como él lo apunta; obligarle a escribir `1,5`
-  sería que él se adapte a la app, cuando el objetivo es el contrario. **Se muestra en horas
-  con dos decimales** (`80` → `0,80`), que es el formato del sector: se verificó contra una
-  factura de concesionario, donde la columna *Cantidad* dice `0,80` y `0,80 × 46,50 € = 37,20 €`.
-  Es el mismo dato dividido entre 100. La conversión vive en `utils/formato.js`, con tests.
-  *(Esto dio dos vueltas: primero se convertía a horas, luego se quitó al entender que la
-  notación en centésimas también valía para el cliente, y finalmente se recuperó al ver una
-  factura real. La lección: preguntar por el dato concreto —cómo se escribe vs. cómo se
-  imprime— y contrastarlo con un documento de verdad.)*
+- **Las horas van en decimal** (`1` = 1 h, `0,50` = media, `0,80` = 48 min): la misma unidad al
+  escribir, al guardar y al imprimir. Es el formato del sector, verificado contra una factura de
+  concesionario donde la columna *Cantidad* dice `0,80` y `0,80 × 46,50 € = 37,20 €`.
+
+  *La unidad dio tres vueltas.* Se empezó en **centésimas de hora** (`100` = 1 h) porque así se
+  entendió que lo apuntaba el titular, con conversión `/100` al imprimir; luego se quitó la
+  conversión al responder él que el formato `100` también valía para el cliente; y finalmente,
+  al ver una factura real, se unificó todo en horas decimales, que es lo que él escribe de
+  verdad. **La lección: preguntar por el dato concreto —cómo se escribe frente a cómo se
+  imprime— y contrastarlo con un documento real, no con un recuerdo.** El cambio de unidad se
+  hizo aprovechando que la función aún no estaba en uso: con facturas ya emitidas habría exigido
+  migrar datos o inventar un campo nuevo. El campo pasa a llamarse `horas` (antes `tiempo`),
+  y así una línea del formato viejo no puede leerse por error como horas.
 - **La tarifa vive en cada línea**, no se lee de la configuración al mostrar la factura. Si
   mañana sube la hora a 25 €, las facturas viejas **no pueden cambiar solas**. Por lo mismo se
   guarda también el importe ya calculado. Y permite cobrar distinto un trabajo especializado.
@@ -40,11 +108,11 @@ manoDeObra   // el total en €, ya calculado
   pero el campo sigue siendo editable.
 
 ### Cálculo (`utils/calculos.js`)
-- `calcularManoDeObra(tiempo, precioHora)` → `(tiempo / 100) * precioHora`, por línea.
+- `calcularManoDeObra(horas, precioHora)` → `horas * precioHora`, por línea.
 - `calcularTotalManoDeObra(lineas)` → suma cada línea con **su** tarifa. No vale multiplicar un
-  tiempo total por una tarifa única.
-- Tests: de 46 a **69**, incluidos los que blindan la conversión rara (`50 → media hora`,
-  `25 → cuarto`) y el caso de la lista inexistente, que es el de las facturas antiguas.
+  total de horas por una tarifa única.
+- Tests: de 46 a **101**, incluidos el caso real del concesionario (`0,80 h × 46,50 € = 37,20 €`)
+  y el de la lista inexistente, que es el de las facturas antiguas.
 
 ### Fallos encontrados por el camino
 
@@ -77,14 +145,33 @@ manoDeObra   // el total en €, ya calculado
 
 ### Formularios más claros
 - **Cabecera de columnas** en Materiales y en Mano de obra. Los *placeholders* desaparecen al
-  escribir, así que sin títulos quedaban casillas sin nombre — y con la notación de centésimas
+  escribir, así que sin títulos quedaban casillas sin nombre — y con una notación de tiempo poco común
   eso era directamente indescifrable. Importe por línea en vivo, en ambas secciones.
-- **El campo de tiempo es de texto**, no `type="number"`: sin *spinner*, y validado por nosotros
-  con `pattern: /^\d*$/` (enteros, sin decimales). `inputMode="numeric"` mantiene el teclado
-  numérico en el móvil. Un `type="number"` con `step` rechazaba valores como `33`.
+- **El campo de horas es de texto**, no `type="number"`: sin *spinner*, y sin las reglas de `step`
+  del navegador, que rechazaban valores intermedios. La validación la ponemos nosotros con
+  `pattern: /^\d*([.,]\d{1,2})?$/` (decimal, coma o punto, dos decimales como mucho), e
+  `inputMode="decimal"` saca el teclado numérico en el móvil.
 - **El precio de material arranca vacío**, no a `0`. Ese `0` era el valor real del campo y había
   que borrarlo para escribir encima (en julio se paliaba seleccionando al enfocar).
-- Campos obligatorios **en negrita**, además del asterisco.
+- Campos obligatorios **en negrita**, además del asterisco. Y los cinco campos que solo tenían
+  *placeholder* (matrícula, marca, modelo, nombre, DNI) pasan a tener **etiqueta de verdad**:
+  el nombre desaparecía al escribir, justo cuando hace falta. Regla que queda fijada: **la
+  etiqueta es el nombre, el placeholder es un ejemplo**.
+- **Los errores se ven al salir del campo**, no solo al pulsar Guardar: `mode: 'onTouched'` en
+  `useForm`. Y en las líneas de mano de obra el mensaje sale **debajo de su fila**, con el texto
+  concreto; antes había un aviso genérico al final de la sección que, con varias tareas, no
+  decía cuál fallaba.
+
+### El fallo de la coma
+Al pasar las horas a decimal, el importe de cada línea se veía bien pero **el total se quedaba a
+0**. Causa: había dos caminos para el mismo dato. El importe por línea pasaba por
+`numeroDesdeTexto`, mientras que el total llamaba a `calcularTotalManoDeObra` con el texto crudo,
+y **`Number('0,5')` es `NaN`**. Con punto funcionaba; con coma, no.
+
+Arreglado haciendo que el total en vivo use `limpiarLineasManoDeObra`, **la misma función que al
+guardar**: además de resolver la coma, garantiza que lo que se ve y lo que se graba salgan de la
+misma tubería. Las facturas guardadas nunca estuvieron mal —`onSubmit` ya usaba la función
+correcta—, solo la previsualización.
 
 ### `NaN`, el tema recurrente
 `valueAsNumber` devuelve **`NaN`** —no `0` ni `undefined`— cuando un campo numérico está vacío, y
@@ -102,7 +189,7 @@ vacías** antes de guardar. Qué cuenta como vacía:
 
 - **Material:** sin descripción **ni** precio. La *cantidad* no sirve de señal: viene con un `1`
   por defecto que no significa que nadie haya escrito nada.
-- **Mano de obra:** sin tarea **ni** tiempo. La *tarifa* tampoco sirve de señal: desde este
+- **Mano de obra:** sin tarea **ni** horas. La *tarifa* tampoco sirve de señal: desde este
   cambio la línea nace con el precio de la configuración ya puesto, así que usarla habría
   impedido descartar ninguna.
 

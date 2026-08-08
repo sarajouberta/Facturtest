@@ -53,33 +53,38 @@ describe('calcularTotal', () => {
     })
 })
 
-//el tiempo de mano de obra se representa como 1h = 100:
+// Las horas van en decimal: 0,5 = media hora, 0,25 = cuarto
 describe('calcularManoDeObra', () => {
-    test('100 = una hora completa a la tarifa', () => {
-        expect(calcularManoDeObra(100, 20)).toBe(20)
+    test('una hora completa a la tarifa', () => {
+        expect(calcularManoDeObra(1, 20)).toBe(20)
     })
 
-    test('50 = media hora a la tarifa', () => {
-        expect(calcularManoDeObra(50, 20)).toBe(10)
+    test('media hora a la tarifa', () => {
+        expect(calcularManoDeObra(0.5, 20)).toBe(10)
     })
 
-    test('150 = hora y media a la tarifa', () => {
-        expect(calcularManoDeObra(150, 20)).toBe(30)
+    test('hora y media a la tarifa', () => {
+        expect(calcularManoDeObra(1.5, 20)).toBe(30)
     })
 
-    test('25 = cuarto de hora a la tarifa', () => {
-        expect(calcularManoDeObra(25, 20)).toBe(5)
+    test('cuarto de hora a la tarifa', () => {
+        expect(calcularManoDeObra(0.25, 20)).toBe(5)
     })
 
-    test('tiempo a 0', () => {
+    // El caso de la factura de concesionario que sirvio de modelo
+    test('0,80 h a 46,50 EUR son 37,20 EUR', () => {
+        expect(calcularManoDeObra(0.8, 46.5)).toBe(37.2)
+    })
+
+    test('horas a 0', () => {
         expect(calcularManoDeObra(0, 20)).toBe(0)
     })
 
     test('tarifa a 0', () => {
-        expect(calcularManoDeObra(100, 0)).toBe(0)
+        expect(calcularManoDeObra(1, 0)).toBe(0)
     })
 
-    test('un tiempo sin rellenar (NaN) cuenta como 0', () => {
+    test('unas horas sin rellenar (NaN) cuentan como 0', () => {
         expect(calcularManoDeObra(NaN, 20)).toBe(0)
     })
 })
@@ -87,16 +92,16 @@ describe('calcularManoDeObra', () => {
 describe('calcularTotalManoDeObra', () => {
     test('suma el importe de cada línea', () => {
         const lineas = [
-            { tiempo: 100, precioHora: 20 },  // 20
-            { tiempo: 50, precioHora: 20 },   // 10
+            { horas: 1, precioHora: 20 },  // 20
+            { horas: 0.5, precioHora: 20 },   // 10
         ]
         expect(calcularTotalManoDeObra(lineas)).toBe(30)
     })
 
     test('cada línea puede llevar su propia tarifa', () => {
         const lineas = [
-            { tiempo: 100, precioHora: 20 },  // 20
-            { tiempo: 100, precioHora: 35 },  // 35  (p. ej. trabajo especializado)
+            { horas: 1, precioHora: 20 },  // 20
+            { horas: 1, precioHora: 35 },  // 35  (p. ej. trabajo especializado)
         ]
         expect(calcularTotalManoDeObra(lineas)).toBe(55)
     })
@@ -111,18 +116,18 @@ describe('calcularTotalManoDeObra', () => {
 
     test('ignora las líneas a medio rellenar', () => {
         const lineas = [
-            { tiempo: 100, precioHora: 20 },       // 20
-            { descripcion: 'sin tiempo ni tarifa' } // 0
+            { horas: 1, precioHora: 20 },       // 20
+            { descripcion: 'sin horas ni tarifa' } // 0
         ]
         expect(calcularTotalManoDeObra(lineas)).toBe(20)
     })
 
     test('redondea a 2 decimales el total, no cada línea', () => {
-        // 33 centésimas a 10 €/h = 3,30 € por línea; tres líneas = 9,90 €
+        // 0,33 h a 10 EUR = 3,30 EUR por linea; tres lineas = 9,90 EUR
         const lineas = [
-            { tiempo: 33, precioHora: 10 },
-            { tiempo: 33, precioHora: 10 },
-            { tiempo: 33, precioHora: 10 },
+            { horas: 0.33, precioHora: 10 },
+            { horas: 0.33, precioHora: 10 },
+            { horas: 0.33, precioHora: 10 },
         ]
         expect(calcularTotalManoDeObra(lineas)).toBe(9.9)
     })

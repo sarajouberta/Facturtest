@@ -9,6 +9,8 @@
       cada tipo; si no se rellena ni se borra, se guardaba tal cual y aparecía en
       la factura como una fila en blanco con importes a 0. */
 
+import { numeroDesdeTexto } from './formato'
+
 function textoLimpio(valor) {
     return String(valor ?? '').trim()
 }
@@ -22,21 +24,24 @@ export function limpiarConceptos(conceptos) {
             ...concepto,
             descripcion: textoLimpio(concepto?.descripcion),
             cantidad: Number(concepto?.cantidad) || 0,
-            precioUnitario: Number(concepto?.precioUnitario) || 0,
+            // El precio se teclea como texto y puede llevar coma ('46,50')
+            precioUnitario: numeroDesdeTexto(concepto?.precioUnitario),
         }))
         .filter((concepto) => concepto.descripcion !== '' || concepto.precioUnitario > 0)
 }
 
-/* Una línea de mano de obra cuenta como vacía si no tiene descripción NI tiempo.
+/* Una línea de mano de obra cuenta como vacía si no tiene descripción NI horas.
    La tarifa no sirve de señal: se rellena sola desde la configuración, así que
-   una línea intacta ya viene con ella puesta. */
+   una línea intacta ya viene con ella puesta.
+   Las horas se teclean en un campo de texto y pueden llevar coma ('0,8'), por eso
+   pasan por numeroDesdeTexto y no por Number a secas. */
 export function limpiarLineasManoDeObra(lineas) {
     return (lineas ?? [])
         .map((linea) => ({
             ...linea,
             descripcion: textoLimpio(linea?.descripcion),
-            tiempo: Number(linea?.tiempo) || 0,
-            precioHora: Number(linea?.precioHora) || 0,
+            horas: numeroDesdeTexto(linea?.horas),
+            precioHora: numeroDesdeTexto(linea?.precioHora),
         }))
-        .filter((linea) => linea.descripcion !== '' || linea.tiempo > 0)
+        .filter((linea) => linea.descripcion !== '' || linea.horas > 0)
 }

@@ -312,11 +312,14 @@ las reglas de arriba.
 }
 ```
 
-**El `tiempo` va en centésimas de hora**, que es como lo apunta el taller: `100` = 1 h,
-`50` = media, `25` = cuarto. **Se guarda así y se muestra en horas con dos decimales**
-(`80` → `0,80`), que es el formato estándar del sector: se comprobó en una factura de
-concesionario, donde `0,80 × 46,50 € = 37,20 €`. La conversión está aislada en
-`utils/formato.js` (`tiempoEnHoras`), con tests.
+**Las `horas` van en decimal**: `1` = 1 h, `0,50` = media, `0,25` = cuarto, `0,80` = 48 min.
+Es **la misma unidad al escribir, al guardar y al imprimir**, y es el formato estándar del
+sector: se comprobó en una factura de concesionario, donde `0,80 × 46,50 € = 37,20 €`.
+
+Se teclea en un campo de **texto** (no `type="number"`: sin *spinner* y sin las reglas de `step`
+del navegador), admitiendo coma o punto, y se convierte con `numeroDesdeTexto` — necesario
+porque `Number('0,8')` da `NaN`, ya que JavaScript solo entiende el punto. Para mostrarlas,
+`formatearHoras`. Ambas en `utils/formato.js`, con tests.
 
 **Configuración del taller** (documento único, `users/{uid}/config/taller`)
 ```js

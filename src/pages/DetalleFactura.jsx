@@ -3,7 +3,7 @@ import { useFactura, useConfig, borrarFactura } from '../datos'
 
 import FacturaPDF from '../components/FacturaPDF'
 import { calcularManoDeObra } from '../utils/calculos'
-import { tiempoEnHoras } from '../utils/formato'
+import { formatearHoras } from '../utils/formato'
 import { useRef } from 'react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas-pro'
@@ -158,15 +158,15 @@ function DetalleFactura() {
                         {factura.lineasManoDeObra.map((l, i) => (
                             <tr key={i} className="border-b">
                                 <td className="py-1">{l.descripcion}</td>
-                                {/* En horas con dos decimales, igual que en el PDF */}
+                                {/* En horas decimales, igual que en el PDF */}
                                 <td className="py-1 text-right">
-                                    {tiempoEnHoras(l.tiempo)}
+                                    {formatearHoras(l.horas)}
                                 </td>
                                 <td className="py-1 text-right">
                                     {(Number(l.precioHora) || 0).toFixed(2)} €
                                 </td>
                                 <td className="py-1 text-right">
-                                    {calcularManoDeObra(l.tiempo, l.precioHora).toFixed(2)} €
+                                    {calcularManoDeObra(l.horas, l.precioHora).toFixed(2)} €
                                 </td>
                             </tr>
                         ))}

@@ -5,6 +5,7 @@ import { useConfig, guardarConfig } from '../datos'
 import { useNavigate } from 'react-router-dom'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import { camposConfigPendientes, clavesConfigPendientes } from '../utils/configuracion'
+import { numeroDesdeTexto, formatearDecimal } from '../utils/formato'
 
 
 function Configuracion() {
@@ -23,8 +24,20 @@ function Configuracion() {
   const config = useConfig()
   useEffect(() => {
     if (config === undefined) return   // aún cargando, nada
-    if (config) reset(config)          // hay datos: rellenamos el formulario
-    else setPrimeraVez(true)           // null: es la primera vez
+    if (config) {
+      /* La tarifa se guarda como número (46.5) pero el campo es de texto: se
+         formatea al rellenarlo para que se vea '46,50', tal y como se escribió,
+         y no '46.5'. Si no hay valor, se deja vacío para que salga el placeholder
+         (y no un '0,00' que parecería un dato de verdad). */
+      reset({
+        ...config,
+        precioManoDeObra: Number.isFinite(config.precioManoDeObra)
+          ? formatearDecimal(config.precioManoDeObra)
+          : '',
+      })
+    } else {
+      setPrimeraVez(true)              // null: es la primera vez
+    }
   }, [config, reset])
 
 
@@ -32,8 +45,20 @@ function Configuracion() {
   //al pulsar "Guardar", se escribe en la base de datos
   const onSubmit = async (datos) => {
     setGuardado(false)   // se limpia el aviso anterior por si es un segundo intento
+    /* La tarifa se teclea como texto y puede llevar coma ('46,50'): se convierte
+       aquí, al guardar, y no con setValueAs, porque setValueAs se ejecuta ANTES
+       de validar y el pattern recibiría un número ya convertido — con lo que no
+       rechazaría nunca nada. */
+    /* Un campo vaciado se guarda como null, no como 0: son cosas distintas.
+       numeroDesdeTexto('') devuelve 0, y un 0 guardado se leería como "hay
+       tarifa, y vale cero", ocultando el aviso de campo pendiente. */
+    const tarifa = String(datos.precioManoDeObra ?? '').trim()
+    const aGuardar = {
+      ...datos,
+      precioManoDeObra: tarifa === '' ? null : numeroDesdeTexto(tarifa),
+    }
     try {
-      await guardarConfig(datos)
+      await guardarConfig(aGuardar)
     } catch (error) {
       console.error('❌ Error al guardar la configuración:', error)
       alert('No se pudieron guardar los datos. Revisa la conexión e inténtalo de nuevo.')
@@ -110,11 +135,18 @@ function Configuracion() {
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">Precio mano de obra (€/hora)</span>
-          <input type="number" min="1" placeholder="p. ej. 20" className={claseCampo('precioManoDeObra')}
+          {/* Campo de texto con nuestra propia regla, igual que los importes de la
+              factura: con type="number", un precio escrito con coma puede quedarse
+              vacío según el navegador y guardarse como NaN sin avisar. Y este valor
+              es el que prerrellena la tarifa de todas las líneas nuevas. */}
+          <input type="text" inputMode="decimal" placeholder="p. ej. 46,50"
+            className={claseCampo('precioManoDeObra')}
             onFocus={(e) => e.target.select()}
             {...register('precioManoDeObra', {
-              valueAsNumber: true,
-              min: { value: 1, message: 'El precio debe ser, como mínimo, 1' },
+              pattern: {
+                value: /^\d*([.,]\d{1,2})?$/,
+                message: 'La tarifa va en euros por hora, p. ej. 46,50 (máximo 2 decimales)',
+              },
             })} />
           {errors.precioManoDeObra && (
             <span className="text-red-600 text-sm">{errors.precioManoDeObra.message}</span>

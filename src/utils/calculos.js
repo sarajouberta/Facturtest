@@ -25,19 +25,21 @@ export function calcularBaseImponible(totalMateriales, manoDeObra) {
     return redondear(totalMateriales + (Number(manoDeObra) || 0))
 }
 
-//el precio de la mano de obra ahora viene del valor puesto en la configuración: representado como 1h= 100
-export function calcularManoDeObra(tiempo, precioHora) {
-    const t = Number(tiempo) || 0
+/* Mano de obra de una línea = horas × precio por hora.
+   Las horas van en decimal (0,80 = 48 min), que es como se apunta y como se
+   imprime en el sector: la misma unidad en todas partes, sin conversiones. */
+export function calcularManoDeObra(horas, precioHora) {
+    const h = Number(horas) || 0
     const p = Number(precioHora) || 0
-    return redondear((t / 100) * p)
+    return redondear(h * p)
 }
 
-/* Suma la mano de obra de todas las líneas. Cada línea es una tarea con su propio
-   tiempo y su propia tarifa, así que se calcula una a una y se suma; no vale
-   multiplicar un tiempo total por una tarifa única. */
+/* Suma la mano de obra de todas las líneas. Cada línea es una tarea con sus
+   propias horas y su propia tarifa, así que se calcula una a una y se suma; no
+   vale multiplicar un total de horas por una tarifa única. */
 export function calcularTotalManoDeObra(lineas) {
     const total = (lineas ?? []).reduce(
-        (suma, linea) => suma + calcularManoDeObra(linea?.tiempo, linea?.precioHora),
+        (suma, linea) => suma + calcularManoDeObra(linea?.horas, linea?.precioHora),
         0,
     )
     return redondear(total)

@@ -38,6 +38,18 @@ describe('camposConfigPendientes', () => {
         expect(camposConfigPendientes({ ...COMPLETA, iva: 0 })).toEqual([])
     })
 
+    /* Pero una tarifa de 0 €/hora no significa nada: es un hueco. Pasa al vaciar
+       el campo, porque convertir '' a número da 0. */
+    test('una tarifa a 0 sí cuenta como pendiente', () => {
+        expect(camposConfigPendientes({ ...COMPLETA, precioManoDeObra: 0 }))
+            .toEqual(['Precio mano de obra'])
+    })
+
+    test('una tarifa borrada (null) cuenta como pendiente', () => {
+        expect(camposConfigPendientes({ ...COMPLETA, precioManoDeObra: null }))
+            .toEqual(['Precio mano de obra'])
+    })
+
     test('sin configuración, faltan todos', () => {
         expect(camposConfigPendientes(null)).toEqual([
             'Nombre comercial', 'NIF', 'Precio mano de obra', 'IVA',

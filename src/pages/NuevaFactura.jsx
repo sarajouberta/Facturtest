@@ -8,6 +8,7 @@ import { nifValido, telefonoValido } from '../utils/validaciones'
 import { matriculaParaGuardar } from '../utils/matricula'
 import { buscarPorMatricula } from '../utils/busqueda'
 import { limpiarConceptos, limpiarLineasManoDeObra } from '../utils/lineas'
+import { numeroDesdeTexto } from '../utils/formato'
 import { camposConfigPendientes } from '../utils/configuracion'
 import {
   calcularTotalMateriales,
@@ -20,6 +21,10 @@ import {
 function NuevaFactura() {
   const { register, control, handleSubmit, watch, setValue, getValues, setError,
     formState: { errors } } = useForm({
+      /* onTouched: cada campo se valida al salir de él por primera vez, y a partir
+         de ahí mientras se escribe. Por defecto RHF solo valida al enviar, así que
+         los errores no aparecían hasta pulsar Guardar. */
+      mode: 'onTouched',
       defaultValues: {
         numero: '',
         /* 'sv-SE' es el único locale estándar que da el formato AAAA-MM-DD que
@@ -42,9 +47,9 @@ function NuevaFactura() {
            placeholder y se convierte a 0 al guardar. */
         conceptos: [{ descripcion: '', cantidad: 1, precioUnitario: '' }],
         /* Cada línea de mano de obra es una tarea: qué se hizo, cuánto tiempo
-           (en centésimas de hora: 100 = 1 h) y a qué tarifa. La tarifa se
+           (horas en decimal: 0,80 = 48 min) y a qué tarifa. La tarifa se
            rellena desde la configuración del taller en cuanto carga. */
-        lineasManoDeObra: [{ descripcion: '', tiempo: '', precioHora: 0 }],
+        lineasManoDeObra: [{ descripcion: '', horas: '', precioHora: 0 }],
         iva: 21,
       },
     })
@@ -68,9 +73,16 @@ function NuevaFactura() {
   const lineasManoDeObra = watch('lineasManoDeObra')
   const iva = watch('iva')
 
-  const totalMateriales = calcularTotalMateriales(conceptos)
-  // La mano de obra ya no se teclea: sale de sumar las líneas.
-  const manoDeObra = calcularTotalManoDeObra(lineasManoDeObra)
+  /* Los totales en vivo se calculan sobre las líneas ya normalizadas, con la MISMA
+     función que al guardar: los importes se teclean como texto y pueden llevar
+     coma, y Number('46,50') es NaN. Así lo que se ve y lo que se graba coinciden. */
+  const totalMateriales = calcularTotalMateriales(limpiarConceptos(conceptos))
+  /* La mano de obra ya no se teclea: sale de sumar las líneas. Se normalizan
+     antes con la MISMA función que al guardar, porque las horas llegan como
+     texto y pueden traer coma: Number('0,5') es NaN y el total saldría a 0.
+     Usar la misma tubería garantiza que lo que se ve en vivo y lo que se graba
+     sean el mismo número. */
+  const manoDeObra = calcularTotalManoDeObra(limpiarLineasManoDeObra(lineasManoDeObra))
   const baseImponible = calcularBaseImponible(totalMateriales, manoDeObra)
   const total = calcularTotal(baseImponible, iva)
 
@@ -235,12 +247,18 @@ function NuevaFactura() {
         {/* Datos del vehículo — primero, porque la matrícula reconoce al cliente */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Vehículo</legend>
-          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Matrícula * (p. ej. 1234 ABC)"
-            {...matriculaReg}
-            onBlur={(e) => { matriculaReg.onBlur(e); buscarVehiculo(e.target.value) }} />
-          {errors.vehiculo?.matricula && (
-            <span className="text-red-600 text-sm">{errors.vehiculo.matricula.message}</span>
-          )}
+          {/* Etiqueta = el nombre del campo (siempre visible); placeholder = un
+              ejemplo. Antes el nombre iba en el placeholder y desaparecía al
+              escribir, dejando casillas sin identificar. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-bold">Matrícula *</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. 1234 ABC"
+              {...matriculaReg}
+              onBlur={(e) => { matriculaReg.onBlur(e); buscarVehiculo(e.target.value) }} />
+            {errors.vehiculo?.matricula && (
+              <span className="text-red-600 text-sm">{errors.vehiculo.matricula.message}</span>
+            )}
+          </label>
           {vehiculoRecurrente && (
             <div className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 text-sm flex items-center justify-between gap-2">
               <span> Este vehículo ya está: <strong>{vehiculoRecurrente.cliente?.nombre}</strong>. ¿Rellenar sus datos?</span>
@@ -253,50 +271,89 @@ function NuevaFactura() {
               </button>
             </div>
           )}
-          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Modelo *"
-            {...register('vehiculo.modelo', { required: 'El modelo es obligatorio' })} />
-          {errors.vehiculo?.modelo && (
-            <span className="text-red-600 text-sm">{errors.vehiculo.modelo.message}</span>
-          )}
-          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Marca *"
-            {...register('vehiculo.vehiculo', { required: 'La marca es obligatoria' })} />
-          {errors.vehiculo?.vehiculo && (
-            <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
-          )}
-          <input className="border rounded px-3 py-2" placeholder="Km"
-            {...register('vehiculo.km')} />
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-bold">Marca *</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. Renault"
+              {...register('vehiculo.vehiculo', { required: 'La marca es obligatoria' })} />
+            {errors.vehiculo?.vehiculo && (
+              <span className="text-red-600 text-sm">{errors.vehiculo.vehiculo.message}</span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-bold">Modelo *</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. Clio"
+              {...register('vehiculo.modelo', { required: 'El modelo es obligatorio' })} />
+            {errors.vehiculo?.modelo && (
+              <span className="text-red-600 text-sm">{errors.vehiculo.modelo.message}</span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Km</span>
+            {/* Opcional, pero si se rellena tiene que ser un número: hasta ahora
+                admitía cualquier texto y acababa impreso tal cual en la factura.
+                Enteros, sin decimales ni separador de miles. */}
+            <input className="border rounded px-3 py-2" inputMode="numeric"
+              placeholder="p. ej. 150000"
+              {...register('vehiculo.km', {
+                pattern: {
+                  value: /^\d*$/,
+                  message: 'Los kilómetros van en números, sin puntos ni letras',
+                },
+              })} />
+            {errors.vehiculo?.km && (
+              <span className="text-red-600 text-sm">{errors.vehiculo.km.message}</span>
+            )}
+          </label>
         </fieldset>
 
 
         {/* Datos del cliente */}
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Cliente</legend>
-          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="Nombre *"
-            {...register('cliente.nombre', { required: 'El nombre del cliente es obligatorio' })} />
-          {errors.cliente?.nombre && (
-            <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
-          )}
-          <input className="border rounded px-3 py-2 placeholder:font-bold" placeholder="DNI / CIF * (p. ej. 12345678Z)"
-            {...register('cliente.nif', {
-              required: 'El DNI del cliente es obligatorio',
-              validate: (v) => nifValido(v) || 'DNI/CIF no válido',
-            })} />
-          {errors.cliente?.nif && (
-            <span className="text-red-600 text-sm">{errors.cliente.nif.message}</span>
-          )}
-          <input className="border rounded px-3 py-2" placeholder="Domicilio"
-            {...register('cliente.direccion')} />
-          <input className="border rounded px-3 py-2" placeholder="Localidad"
-            {...register('cliente.localidad')} />
-          <input className="border rounded px-3 py-2" placeholder="Provincia"
-            {...register('cliente.provincia')} />
-          <input className="border rounded px-3 py-2" placeholder="Teléfono (p. ej. 600123456)"
-            {...register('cliente.telefono', {
-              validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
-            })} />
-          {errors.cliente?.telefono && (
-            <span className="text-red-600 text-sm">{errors.cliente.telefono.message}</span>
-          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-bold">Nombre *</span>
+            <input className="border rounded px-3 py-2" placeholder="Nombre y apellidos"
+              {...register('cliente.nombre', { required: 'El nombre del cliente es obligatorio' })} />
+            {errors.cliente?.nombre && (
+              <span className="text-red-600 text-sm">{errors.cliente.nombre.message}</span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-bold">DNI / CIF *</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. 12345678Z"
+              {...register('cliente.nif', {
+                required: 'El DNI del cliente es obligatorio',
+                validate: (v) => nifValido(v) || 'DNI/CIF no válido',
+              })} />
+            {errors.cliente?.nif && (
+              <span className="text-red-600 text-sm">{errors.cliente.nif.message}</span>
+            )}
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Domicilio</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. C/ Uría 12, 3º B"
+              {...register('cliente.direccion')} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Localidad</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. Oviedo"
+              {...register('cliente.localidad')} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Provincia</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. Asturias"
+              {...register('cliente.provincia')} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm font-medium">Teléfono</span>
+            <input className="border rounded px-3 py-2" placeholder="p. ej. 600123456"
+              {...register('cliente.telefono', {
+                validate: (v) => !v || telefonoValido(v) || 'Teléfono no válido (9 cifras)',
+              })} />
+            {errors.cliente?.telefono && (
+              <span className="text-red-600 text-sm">{errors.cliente.telefono.message}</span>
+            )}
+          </label>
         </fieldset>
 
         {/* Trabajos realizados */}
@@ -341,22 +398,26 @@ function NuevaFactura() {
                 })}
                 onFocus={(e) => e.target.select()}
               />
+              {/* Igual que las horas: campo de texto con nuestra propia regla.
+                  Con type="number", un precio escrito con coma puede quedarse
+                  vacío según el navegador y guardarse como 0 sin avisar. */}
               <input
-                type="number"
-                step="0.01"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 className="border rounded px-3 py-2 w-24"
                 placeholder="Precio"
                 {...register(`conceptos.${index}.precioUnitario`, {
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'El precio no puede ser negativo' },
+                  pattern: {
+                    value: /^\d*([.,]\d{1,2})?$/,
+                    message: 'El precio va en euros, p. ej. 46,50 (máximo 2 decimales)',
+                  },
                 })}
                 onFocus={(e) => e.target.select()}
               />
               {/* Importe de la línea, en vivo */}
               <span className="w-20 text-right text-sm text-gray-600">
                 {((Number(conceptos?.[index]?.cantidad) || 0) *
-                  (Number(conceptos?.[index]?.precioUnitario) || 0)).toFixed(2)} €
+                  numeroDesdeTexto(conceptos?.[index]?.precioUnitario)).toFixed(2)} €
               </span>
               <button type="button" onClick={() => remove(index)}
                 className="text-red-600 w-8">
@@ -387,62 +448,71 @@ function NuevaFactura() {
           {/* Mismos anchos que los inputs de abajo, para que las columnas cuadren */}
           <div className="flex gap-2 items-center text-xs font-medium text-gray-500">
             <span className="flex-1">Tarea</span>
-            <span className="w-24 text-right">Tiempo</span>
+            <span className="w-24 text-right">Cantidad</span>
             <span className="w-24 text-right">€/hora</span>
             <span className="w-20 text-right">Importe</span>
             <span className="w-8" aria-hidden="true"></span>
           </div>
           {fieldsManoDeObra.map((field, index) => (
-            <div key={field.id} className="flex gap-2 items-center">
+            <div key={field.id} className="flex flex-col gap-1">
+              <div className="flex gap-2 items-center">
               <input className="border rounded px-3 py-2 flex-1" placeholder="Tarea"
                 {...register(`lineasManoDeObra.${index}.descripcion`)}
               />
               {/* Campo de texto, no type="number": así no aparece el spinner (las
-                  flechitas) ni el navegador impone sus propias reglas de step.
-                  inputMode="numeric" hace que en el móvil salga el teclado de
-                  cifras. La regla la ponemos nosotros: solo dígitos, sin
-                  decimales ni signo. Vacío se admite y cuenta como 0. */}
-              <input type="text" inputMode="numeric"
-                className="border rounded px-3 py-2 w-24" placeholder="Tiempo"
-                {...register(`lineasManoDeObra.${index}.tiempo`, {
+                  flechitas) ni el navegador impone sus reglas de step, que
+                  rechazaban valores intermedios. inputMode="decimal" saca en el
+                  móvil el teclado numérico con la coma.
+                  Horas en decimal, con coma o punto y hasta 2 decimales.
+                  Vacío se admite y cuenta como 0. */}
+              <input type="text" inputMode="decimal"
+                className="border rounded px-3 py-2 w-24" placeholder="0,80"
+                {...register(`lineasManoDeObra.${index}.horas`, {
                   pattern: {
-                    value: /^\d*$/,
-                    message: 'El tiempo debe ser un número entero, sin decimales',
+                    value: /^\d*([.,]\d{1,2})?$/,
+                    message: 'Las horas van en decimal, p. ej. 0,80 (máximo 2 decimales)',
                   },
                 })}
                 onFocus={(e) => e.target.select()}
               />
-              <input type="number" step="0.01" min="0"
+              <input type="text" inputMode="decimal"
                 className="border rounded px-3 py-2 w-24" placeholder="€/hora"
                 {...register(`lineasManoDeObra.${index}.precioHora`, {
-                  valueAsNumber: true,
-                  min: { value: 0, message: 'La tarifa no puede ser negativa' },
+                  pattern: {
+                    value: /^\d*([.,]\d{1,2})?$/,
+                    message: 'La tarifa va en euros por hora, p. ej. 46,50 (máximo 2 decimales)',
+                  },
                 })}
                 onFocus={(e) => e.target.select()}
               />
-              {/* Importe de esta línea, en vivo: ayuda a ver que 50 son media hora */}
+              {/* Importe de esta línea, en vivo */}
               <span className="w-20 text-right text-sm text-gray-600">
                 {calcularManoDeObra(
-                  lineasManoDeObra?.[index]?.tiempo,
-                  lineasManoDeObra?.[index]?.precioHora,
+                  numeroDesdeTexto(lineasManoDeObra?.[index]?.horas),
+                  numeroDesdeTexto(lineasManoDeObra?.[index]?.precioHora),
                 ).toFixed(2)} €
               </span>
               <button type="button" onClick={() => removeManoDeObra(index)}
                 className="text-red-600 w-8">
                 ✕
               </button>
+              </div>
+              {/* El error, debajo de SU línea y con el mensaje concreto: con varias
+                  tareas, un aviso genérico al final no dice cuál falla. */}
+              {(errors.lineasManoDeObra?.[index]?.horas ||
+                errors.lineasManoDeObra?.[index]?.precioHora) && (
+                <span className="text-red-600 text-sm">
+                  {errors.lineasManoDeObra[index].horas?.message ||
+                    errors.lineasManoDeObra[index].precioHora?.message}
+                </span>
+              )}
             </div>
           ))}
-          {errors.lineasManoDeObra && (
-            <span className="text-red-600 text-sm">
-              Revisa los tiempos y las tarifas de la mano de obra.
-            </span>
-          )}
           <button
             type="button"
             onClick={() => appendManoDeObra({
               descripcion: '',
-              tiempo: '',
+              horas: '',
               // La línea nueva nace con la tarifa del taller ya puesta
               precioHora: Number.isFinite(config?.precioManoDeObra)
                 ? config.precioManoDeObra
@@ -453,8 +523,8 @@ function NuevaFactura() {
           </button>
           {/* La pista va debajo, junto a los campos, y no arriba del todo */}
           <p className="text-sm text-gray-500">
-            El tiempo va en centésimas de hora: <strong>100</strong> = 1 hora ·
-            <strong> 50</strong> = media hora · <strong>25</strong> = cuarto de hora.
+            La cantidad va en horas decimales: <strong>1</strong> = 1 hora ·
+            <strong> 0,50</strong> = media hora · <strong>0,25</strong> = cuarto de hora.
           </p>
         </fieldset>
 

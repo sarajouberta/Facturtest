@@ -27,6 +27,14 @@ describe('limpiarConceptos', () => {
         ])
     })
 
+    // El precio se teclea como texto: con coma no puede perderse por el camino
+    test('un precio escrito con coma se guarda como número', () => {
+        const [concepto] = limpiarConceptos([
+            { descripcion: 'Filtro', cantidad: 2, precioUnitario: '46,50' },
+        ])
+        expect(concepto.precioUnitario).toBe(46.5)
+    })
+
     test('recorta los espacios de la descripción', () => {
         expect(limpiarConceptos([{ descripcion: '  Aceite  ', precioUnitario: 5 }])[0].descripcion)
             .toBe('Aceite')
@@ -55,30 +63,40 @@ describe('limpiarLineasManoDeObra', () => {
     /* Ojo: la tarifa NO sirve para decidir si la línea está vacía. Al añadirla ya
        viene rellena desde la configuración, así que una línea sin tocar tiene
        precioHora pero no es una línea de verdad. */
-    test('descarta una línea con tarifa pero sin tarea ni tiempo', () => {
-        expect(limpiarLineasManoDeObra([{ descripcion: '', tiempo: '', precioHora: 20 }]))
+    test('descarta una linea con tarifa pero sin tarea ni horas', () => {
+        expect(limpiarLineasManoDeObra([{ descripcion: '', horas: '', precioHora: 20 }]))
             .toEqual([])
     })
 
-    test('conserva una línea con tiempo', () => {
-        const lineas = [{ descripcion: '', tiempo: '100', precioHora: 20 }]
+    test('conserva una linea con horas', () => {
+        const lineas = [{ descripcion: '', horas: '0,80', precioHora: 20 }]
         expect(limpiarLineasManoDeObra(lineas)).toEqual([
-            { descripcion: '', tiempo: 100, precioHora: 20 },
+            { descripcion: '', horas: 0.8, precioHora: 20 },
         ])
     })
 
-    test('conserva una línea con tarea aunque no lleve tiempo', () => {
-        const lineas = [{ descripcion: 'Revisión', tiempo: '', precioHora: 20 }]
+    test('conserva una linea con tarea aunque no lleve horas', () => {
+        const lineas = [{ descripcion: 'Revisión', horas: '', precioHora: 20 }]
         expect(limpiarLineasManoDeObra(lineas)).toHaveLength(1)
     })
 
-    test('el tiempo escrito como texto se guarda como número', () => {
-        const [linea] = limpiarLineasManoDeObra([{ descripcion: 'X', tiempo: '150', precioHora: 20 }])
-        expect(linea.tiempo).toBe(150)
-        expect(typeof linea.tiempo).toBe('number')
+    test('las horas escritas con coma se guardan como número', () => {
+        const [linea] = limpiarLineasManoDeObra([{ descripcion: 'X', horas: '1,50', precioHora: 20 }])
+        expect(linea.horas).toBe(1.5)
+        expect(typeof linea.horas).toBe('number')
     })
 
     test('sin lista, devuelve lista vacía', () => {
         expect(limpiarLineasManoDeObra(undefined)).toEqual([])
+    })
+
+    /* El total en vivo del formulario se calcula sobre estas líneas ya limpias.
+       Si se saltara este paso, un '0,5' llegaría como texto a Number(), daría NaN
+       y el total se quedaría a 0 mientras el importe de la línea sí se veía. */
+    test('lo que devuelve sirve para calcular: las comas ya son números', () => {
+        const [linea] = limpiarLineasManoDeObra([
+            { descripcion: 'Diagnosis', horas: '0,5', precioHora: '46,50' },
+        ])
+        expect(linea.horas * linea.precioHora).toBe(23.25)
     })
 })

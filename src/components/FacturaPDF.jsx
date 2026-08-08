@@ -1,7 +1,7 @@
 /*Nota: usa estilos en línea (style={{...}}) con colores hex, no Tailwind, para
   que la captura salga fiel y sin sustos*/
 import { calcularManoDeObra } from '../utils/calculos'
-import { tiempoEnHoras } from '../utils/formato'
+import { formatearHoras } from '../utils/formato'
 
 function FacturaPDF({ factura, config }) {
     if (!factura) return null
@@ -153,10 +153,10 @@ function FacturaPDF({ factura, config }) {
                                     </span>
                                 </td>
                                 <td style={{ ...td, textAlign: 'right' }}>
-                                    {tiempoEnHoras(l.tiempo)}
+                                    {formatearHoras(l.horas)}
                                 </td>
                                 <td style={{ ...td, textAlign: 'right' }}>
-                                    {calcularManoDeObra(l.tiempo, l.precioHora).toFixed(2)} €
+                                    {calcularManoDeObra(l.horas, l.precioHora).toFixed(2)} €
                                 </td>
                             </tr>
                         ))}
