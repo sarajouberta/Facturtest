@@ -68,6 +68,29 @@ fallo se destapó al pasar el campo de numérico a texto, porque el vacío dejó
 
 Tests: de 89 a **107**.
 
+### El botón de exportar PDF, mudo en un móvil concreto
+Síntoma: en un teléfono el botón abre el menú de compartir; en otro **no hace nada**, mientras
+que Eliminar y Volver sí responden. Mismo código, misma versión, distinto dispositivo.
+
+`exportarPDF` no tenía `try/catch` **ni ninguna señal de estar trabajando**, así que cualquier
+fallo se perdía como *rejection* no capturada y la pantalla no se inmutaba. Es el mismo patrón
+que dejó el login mudo el 27/07.
+
+Tres causas posibles, y el arreglo cubre las tres:
+1. **Lentitud sin aviso.** `html2canvas` con `scale: 2` sobre una hoja de 760 px tarda segundos
+   en un móvil modesto. → El botón pasa a mostrar **"Generando PDF…"** y se deshabilita (lo que
+   además evita lanzar dos capturas a la vez).
+2. **Gesto de usuario consumido.** `navigator.share()` exige llamarse poco después de la
+   pulsación, y antes hay dos `await` largos; si el móvil tarda, el navegador rechaza con
+   `NotAllowedError`. Explicaría que funcione en un teléfono rápido y no en uno lento. → Si
+   compartir falla, **se descarga** con `pdf.save()`, que no depende del gesto. Un `AbortError`
+   (el usuario cerró el menú) se ignora en silencio.
+3. **`html2canvas` fallando** por memoria o CSS. → `try/catch` con aviso visible y el detalle en
+   consola. Si resulta ser esta, el siguiente paso es bajar `scale` a `1.5`.
+
+Lo importante no es adivinar cuál era: es que **el botón deja de estar mudo** y el próximo
+intento dirá qué pasa.
+
 ---
 
 ## 2026-08-07 — Mano de obra desglosada por tareas

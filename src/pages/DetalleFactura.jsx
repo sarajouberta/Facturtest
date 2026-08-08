@@ -4,7 +4,7 @@ import { useFactura, useConfig, borrarFactura } from '../datos'
 import FacturaPDF from '../components/FacturaPDF'
 import { calcularManoDeObra } from '../utils/calculos'
 import { formatearHoras } from '../utils/formato'
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas-pro'
 
@@ -15,6 +15,10 @@ function DetalleFactura() {
 
     //añadido para el pdf: hook que crea la "caja" que guarda referencia al elemento del DOM real
     const hojaRef = useRef(null)
+
+    /* Generar el PDF tarda: en un móvil modesto, varios segundos. Sin señal de que
+       está trabajando, el botón parece muerto y se vuelve a pulsar. */
+    const [exportando, setExportando] = useState(false)
 
     const factura = useFactura(id)
 
@@ -39,34 +43,58 @@ function DetalleFactura() {
     del componente, porque esas variables solo existen ahí dentro. Fuera del componente, esas variables "no existen". Es una cuestión de ámbito (scope): una variable solo es visible
     dentro de las llaves { } donde se declaró. */
     const exportarPDF = async () => {
-        //1. Se captura la hoja como imagen:
-        const canvas = await html2canvas(hojaRef.current, { scale: 2 })
-        const imagen = canvas.toDataURL('image/png')
+        if (exportando) return          // evita lanzar dos capturas a la vez
+        setExportando(true)
+        try {
+            //1. Se captura la hoja como imagen:
+            const canvas = await html2canvas(hojaRef.current, { scale: 2 })
+            const imagen = canvas.toDataURL('image/png')
 
-        //2. Se crea un PDF A4 vertical, centrado en horizontal y pegado arriba:
-        const pdf = new jsPDF('p', 'mm', 'a4')
-        const anchoPag = pdf.internal.pageSize.getWidth()
+            //2. Se crea un PDF A4 vertical, centrado en horizontal y pegado arriba:
+            const pdf = new jsPDF('p', 'mm', 'a4')
+            const anchoPag = pdf.internal.pageSize.getWidth()
 
-        const margen = 10 //margen (mm) a los lados y arriba
-        const ratio = canvas.width / canvas.height //identifica orientación (<1: vertical, >1: horizontal)
+            const margen = 10 //margen (mm) a los lados y arriba
+            const ratio = canvas.width / canvas.height //identifica orientación (<1: vertical, >1: horizontal)
 
-        const anchoImg = anchoPag - margen * 2 //a lo ancho, dejando margen lateral
-        const altoImg = anchoImg / ratio  //alto proporcional (puede sobrar por abajo)
+            const anchoImg = anchoPag - margen * 2 //a lo ancho, dejando margen lateral
+            const altoImg = anchoImg / ratio  //alto proporcional (puede sobrar por abajo)
 
-        const x = margen // centrada: mismo margen a izquierda y derecha
-        const y = margen // margen superior pequeño (cerca del borde de arriba)
-        pdf.addImage(imagen, 'PNG', x, y, anchoImg, altoImg)
+            const x = margen // centrada: mismo margen a izquierda y derecha
+            const y = margen // margen superior pequeño (cerca del borde de arriba)
+            pdf.addImage(imagen, 'PNG', x, y, anchoImg, altoImg)
 
-        //3. Se genera el archivo
-        const nombreArchivo = `${factura.numero}.pdf`
-        const blob = pdf.output('blob')
-        const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' })
+            //3. Se genera el archivo
+            const nombreArchivo = `${factura.numero}.pdf`
+            const blob = pdf.output('blob')
+            const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' })
 
-        //4. Se intenta compartir; si no se puede, se descarga:
-        if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
-            await navigator.share({ files: [archivo], title: nombreArchivo })
-        } else {
-            pdf.save(nombreArchivo)
+            //4. Se intenta compartir; si no se puede, se descarga.
+            if (navigator.canShare?.({ files: [archivo] })) {
+                try {
+                    await navigator.share({ files: [archivo], title: nombreArchivo })
+                } catch (errorCompartir) {
+                    /* Compartir exige que la llamada ocurra poco después de la
+                       pulsación. Generar la imagen y el PDF puede tardar varios
+                       segundos en un móvil modesto y, para entonces, el navegador
+                       da por consumido el gesto y rechaza con NotAllowedError.
+                       En ese caso se descarga, que no depende del gesto.
+                       AbortError = el usuario cerró el menú a propósito: no molestamos. */
+                    if (errorCompartir.name === 'AbortError') return
+                    console.error('❌ No se pudo compartir, se descarga:', errorCompartir)
+                    pdf.save(nombreArchivo)
+                }
+            } else {
+                pdf.save(nombreArchivo)
+            }
+        } catch (error) {
+            /* Sin esto, cualquier fallo (memoria al capturar, un CSS que
+               html2canvas no digiera…) dejaba el botón mudo: la promesa se
+               rechazaba y no pasaba nada en pantalla. */
+            console.error('❌ Error al exportar el PDF:', error)
+            alert('No se pudo generar el PDF. Inténtalo de nuevo.')
+        } finally {
+            setExportando(false)
         }
     }
 
@@ -188,8 +216,9 @@ function DetalleFactura() {
                 <button onClick={() => navigate('/')} className="border rounded px-4 py-2">
                     Volver
                 </button>
-                <button onClick={exportarPDF} className="bg-green-600 text-white rounded px-4 py-2">
-                    Exportar PDF
+                <button onClick={exportarPDF} disabled={exportando}
+                    className="bg-green-600 text-white rounded px-4 py-2 disabled:opacity-60">
+                    {exportando ? 'Generando PDF…' : 'Exportar PDF'}
                 </button>
                 <button onClick={eliminar} className="bg-red-600 text-white rounded px-4 py-2">
                     Eliminar
