@@ -5,6 +5,58 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-13 — Logo del taller en la factura, y avisos del exportador
+
+### El logo
+El campo `logo` existía en la configuración desde el principio y nunca se usó. Ahora la cabecera
+de la factura impresa lleva el logo de ASTURTEST (el Kadett) a la izquierda del nombre.
+
+**Va incrustado en el código, no subido por el usuario.** Es una app personalizada para un taller
+concreto y el titular no debería tener que configurarlo. El archivo vive en
+`src/assets/logo-taller.png` y se importa con **`?inline`**, que hace que Vite lo empotre en el
+bundle como base64 en lugar de dejarlo como archivo aparte:
+
+```js
+import logoTaller from '../assets/logo-taller.png?inline'
+```
+
+- *Por qué incrustado y no en `public/`:* al capturar la hoja con html2canvas, una imagen que aún
+  tenga que descargarse puede llegar tarde y salir en blanco **sin dar error**. En base64 ya está
+  dentro del documento. (Y una imagen de otro dominio directamente "contaminaría" el lienzo y
+  rompería la exportación.)
+- *Optimización:* el original pesaba 262 KB; reducido a 261×192 px y en escala de grises —es un
+  dibujo en blanco y negro— pasa a 19 KB. Importa porque todo lo de `public/` entra en el
+  **precache de la PWA**, o sea que se descarga en cada instalación.
+- Medidas **explícitas** en el `<img>` (87×64) y no `width: auto`: html2canvas clona el nodo para
+  capturarlo, y una imagen sin ancho calculado se dibuja con ancho 0.
+- Antes de capturar se **espera a que las imágenes estén cargadas**.
+
+*Si algún día se quiere permitir subirlo, lo natural es `src={config?.logo || logoTaller}`: el del
+código como valor por defecto, y el subido con prioridad.*
+
+**Anécdota que costó cuatro intentos:** "no se ve el logo" era falso. La hoja imprimible está en
+`position: absolute; left: -9999px` —fuera de pantalla, para poder capturarla sin que estorbe—,
+así que **el logo solo se ve en el PDF exportado**, nunca en la pantalla de detalle. Se perdió el
+tiempo cambiando código que ya era correcto. *Lección: antes de tocar nada, verificar qué está
+mirando el usuario y qué está ejecutando el navegador.*
+
+### Los avisos del exportador, mejor calibrados
+El aviso que se añadió para depurar el móvil saltaba **también en el escritorio**, diciendo además
+"búscalo en la carpeta de Descargas del teléfono". En un ordenador, no poder compartir archivos es
+**lo normal** (`navigator.share` es cosa de móviles): descargar es el comportamiento correcto y
+avisar de ello convertía un flujo silencioso en uno que interrumpe.
+
+Ahora el aviso se reserva para lo que de verdad es anómalo:
+
+| Situación | Qué hace |
+|---|---|
+| No existe `navigator.share` (escritorio) | Descarga en silencio |
+| Compartir funciona | Menú de compartir, sin avisos |
+| Compartir existe y **falla** | Descarga **y explica el error concreto** |
+| La API rechaza el archivo | Descarga y lo explica |
+
+---
+
 ## 2026-08-08 — Entrada de números a prueba de errores
 
 Repaso de todos los campos numéricos de la app tras detectar que **`type="number"` no era de

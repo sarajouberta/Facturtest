@@ -46,6 +46,20 @@ function DetalleFactura() {
         if (exportando) return          // evita lanzar dos capturas a la vez
         setExportando(true)
         try {
+            /* 0. Esperar a que las imágenes de la hoja estén cargadas. html2canvas
+               dibuja lo que hay en ese instante: una imagen a medio cargar sale en
+               blanco, sin dar ningún error. */
+            await Promise.all(
+                [...hojaRef.current.querySelectorAll('img')].map((img) => (
+                    img.complete
+                        ? Promise.resolve()
+                        : new Promise((listo) => {
+                            img.onload = listo
+                            img.onerror = listo   // si falla, seguimos: mejor sin logo que sin factura
+                        })
+                )),
+            )
+
             //1. Se captura la hoja como imagen:
             const canvas = await html2canvas(hojaRef.current, { scale: 2 })
             const imagen = canvas.toDataURL('image/png')
@@ -84,13 +98,16 @@ function DetalleFactura() {
                Los avisos son deliberadamente explícitos: esto se está depurando en
                un móvil ajeno (Samsung Internet), donde no hay consola que mirar, y
                el alert es el único canal para saber por dónde ha ido. */
+            /* Descargar. El aviso es opcional a propósito: en un escritorio no
+               poder compartir es lo NORMAL (navigator.share es cosa de móviles),
+               así que ahí se descarga en silencio, como siempre. El aviso se
+               reserva para cuando compartir existía y falló, que es lo que
+               estamos persiguiendo en el móvil. */
             const descargar = (motivo) => {
                 pdf.save(nombreArchivo)
-                alert(
-                    `${motivo}\n\n` +
-                    `El PDF se ha descargado como "${nombreArchivo}". ` +
-                    'Búscalo en la carpeta de Descargas del teléfono.',
-                )
+                if (motivo) {
+                    alert(`${motivo}\n\nEl PDF se ha descargado como "${nombreArchivo}".`)
+                }
             }
 
             if (navigator.canShare?.({ files: [archivo] })) {
@@ -109,8 +126,11 @@ function DetalleFactura() {
                         `(${errorCompartir.name}: ${errorCompartir.message}).`,
                     )
                 }
+            } else if (navigator.canShare) {
+                // La API existe pero rechaza este archivo: eso sí es raro y conviene decirlo
+                descargar('Este navegador no admite compartir este tipo de archivo.')
             } else {
-                descargar('Este navegador no permite compartir archivos.')
+                descargar()   // escritorio: se descarga sin molestar
             }
         } catch (error) {
             /* Sin esto, cualquier fallo (memoria al capturar, un CSS que
