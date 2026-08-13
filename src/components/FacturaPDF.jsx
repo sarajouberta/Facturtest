@@ -90,11 +90,23 @@ function FacturaPDF({ factura, config }) {
                     <div style={{
                         fontWeight: 'bold', marginBottom: '4px'
                     }}>Cliente</div>
+                    {/* Renderizado condicional: {valor && <elemento>} pinta el
+                        elemento solo si el valor es truthy; si está vacío, la
+                        expresión devuelve '' y React no pinta nada. Así los campos
+                        opcionales no dejan etiquetas huérfanas ("Tlf.:" sin número)
+                        ni renglones en blanco.
+                        Ojo: con un 0 NUMÉRICO esto pintaría un "0" suelto; aquí no
+                        pasa porque estos campos se guardan como texto. */}
                     <div>{cli.nombre}</div>
-                    <div>{cli.direccion}</div>
-                    <div>{cli.localidad} {cli.provincia}</div>
+                    {cli.direccion && <div>{cli.direccion}</div>}
+                    {/* filter(Boolean) descarta los vacíos y join(' ') solo pone el
+                        separador ENTRE elementos: si falta uno, no queda el espacio
+                        suelto que dejaba el antiguo {localidad} {provincia}. */}
+                    {(cli.localidad || cli.provincia) && (
+                        <div>{[cli.localidad, cli.provincia].filter(Boolean).join(' ')}</div>
+                    )}
                     <div>DNI/CIF: {cli.nif}</div>
-                    <div>Tlf.: {cli.telefono}</div>
+                    {cli.telefono && <div>Tlf.: {cli.telefono}</div>}
                 </div>
                 <div style={{ ...box, flex: 1 }}>
                     <div style={{
@@ -103,7 +115,7 @@ function FacturaPDF({ factura, config }) {
                     <div>Modelo: {veh.modelo}</div>
                     <div>Vehículo: {veh.vehiculo}</div>
                     <div>Matrícula: {veh.matricula}</div>
-                    <div>Km: {veh.km}</div>
+                    {veh.km && <div>Km: {veh.km}</div>}
                 </div>
             </div>
 

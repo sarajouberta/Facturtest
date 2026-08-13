@@ -168,13 +168,24 @@ function DetalleFactura() {
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <div className="border rounded p-4">
                     <h3 className="font-semibold mb-1">Cliente</h3>
+                    {/* Renderizado condicional: {valor && <elemento>} pinta el
+                        elemento solo si el valor es truthy; si está vacío, React no
+                        pinta nada. Sin esto quedaban renglones en blanco y un "km"
+                        suelto sin cifra. */}
                     <p>{factura.cliente?.nombre}</p>
                     <p className="text-sm text-gray-600">{factura.cliente?.nif}</p>
-                    <p className="text-sm text-gray-600">{factura.cliente?.direccion}</p>
-                    <p className="text-sm text-gray-600">
-                        {factura.cliente?.localidad} {factura.cliente?.provincia}
-                    </p>
-                    <p className="text-sm text-gray-600">{factura.cliente?.telefono}</p>
+                    {factura.cliente?.direccion && (
+                        <p className="text-sm text-gray-600">{factura.cliente.direccion}</p>
+                    )}
+                    {(factura.cliente?.localidad || factura.cliente?.provincia) && (
+                        <p className="text-sm text-gray-600">
+                            {[factura.cliente.localidad, factura.cliente.provincia]
+                                .filter(Boolean).join(' ')}
+                        </p>
+                    )}
+                    {factura.cliente?.telefono && (
+                        <p className="text-sm text-gray-600">{factura.cliente.telefono}</p>
+                    )}
                 </div>
 
                 <div className="border rounded p-4">
@@ -182,7 +193,9 @@ function DetalleFactura() {
                     <p>{factura.vehiculo?.modelo}</p>
                     <p className="text-sm text-gray-600">{factura.vehiculo?.vehiculo}</p>
                     <p className="text-sm text-gray-600">{factura.vehiculo?.matricula}</p>
-                    <p className="text-sm text-gray-600">{factura.vehiculo?.km} km</p>
+                    {factura.vehiculo?.km && (
+                        <p className="text-sm text-gray-600">{factura.vehiculo.km} km</p>
+                    )}
                 </div>
             </div>
             {/* Trabajos realizados */}
