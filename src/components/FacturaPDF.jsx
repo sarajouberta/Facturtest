@@ -2,6 +2,11 @@
   que la captura salga fiel y sin sustos*/
 import { calcularManoDeObra } from '../utils/calculos'
 import { formatearHoras } from '../utils/formato'
+/* ?inline hace que Vite meta la imagen en el código como base64 en vez de dejarla
+   como archivo aparte. Así, al capturar la hoja para el PDF, la imagen ya está
+   dentro del documento: no hay petición de red que pueda llegar tarde ni ruta que
+   pueda fallar, que es lo que nos tuvo dando vueltas. */
+import logoTaller from '../assets/logo-taller.png?inline'
 
 function FacturaPDF({ factura, config }) {
     if (!factura) return null
@@ -43,12 +48,26 @@ function FacturaPDF({ factura, config }) {
                 display: 'flex', justifyContent: 'space-between',
                 alignItems: 'flex-start'
             }}>
-                <div>
-                    <div style={{
-                        fontSize: '26px', fontWeight: 'bold'
-                    }}>{c.nombre}</div>
-                    <div style={{ fontStyle: 'italic' }}>{c.titular}</div>
-                    <div style={{ fontSize: '12px' }}>N.I.F.: {c.nif}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {/* Logo del taller, incrustado en base64 (ver el import): así ya
+                        está dentro del documento al capturar, sin red de por medio.
+                        Medidas EXPLÍCITAS y no width:'auto': html2canvas clona el
+                        nodo, y una imagen sin ancho calculado se dibuja con ancho 0.
+                        87×64 mantiene la proporción del original (261×192). */}
+                    <img
+                        src={logoTaller}
+                        alt=""
+                        width={87}
+                        height={64}
+                        style={{ width: '87px', height: '64px', display: 'block' }}
+                    />
+                    <div>
+                        <div style={{
+                            fontSize: '26px', fontWeight: 'bold'
+                        }}>{c.nombre}</div>
+                        <div style={{ fontStyle: 'italic' }}>{c.titular}</div>
+                        <div style={{ fontSize: '12px' }}>N.I.F.: {c.nif}</div>
+                    </div>
                 </div>
                 <div style={{ textAlign: 'right', fontSize: '12px' }}>
                     <div>{c.actividad}</div>
