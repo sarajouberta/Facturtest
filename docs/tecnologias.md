@@ -161,8 +161,14 @@ Se puede comprobar en el `sw.js` publicado, que acaba con:
 
 | Archivo | Para qué |
 |---|---|
-| `src/utils/calculos.js` | `calcularTotalMateriales` (suma de materiales), `calcularBaseImponible` (materiales + mano de obra) y `calcularTotal` (base + IVA). Lógica pura, separada de React. |
-| `src/utils/numeracion.js` | Generar el número correlativo `F-2026-001` (`generarSiguienteNumero`). |
+| `src/utils/calculos.js` | Todo el dinero: `calcularTotalMateriales`, `calcularManoDeObra` (horas × tarifa, por línea), `calcularTotalManoDeObra` (suma de líneas), `calcularBaseImponible` y `calcularTotal`. Con `redondear()` interno contra la coma flotante. |
+| `src/utils/numeracion.js` | `generarSiguienteNumero` (correlativo, solo dígitos, con número inicial configurable) y `numeroYaUsado` (impide repetir número). |
+| `src/utils/lineas.js` | Prepara las líneas antes de guardar: normaliza los números y **descarta las líneas vacías**. Es la misma función que usan los totales en vivo, para que lo mostrado y lo guardado no diverjan. |
+| `src/utils/formato.js` | `formatearDecimal` / `formatearHoras` (dos decimales, coma española) y `numeroDesdeTexto` (lee `'46,50'`, que `Number()` no entiende). |
+| `src/utils/validaciones.js` | `nifValido`, `telefonoValido` (nivel A: forma, no dígito de control). |
+| `src/utils/matricula.js` | Normaliza la matrícula al guardar (mayúsculas, sin espacios). |
+| `src/utils/busqueda.js` | Buscar por matrícula y localizar el cliente recurrente. |
+| `src/utils/configuracion.js` | Detecta qué campos faltan en la configuración del taller, para avisar sin bloquear. |
 | `src/components/FacturaPDF.jsx` | Componente de la "hoja imprimible" de la factura (recibe `factura` y `config` por props). |
 
 ## Testing (pruebas automáticas)

@@ -50,6 +50,17 @@ function DetalleFactura() {
             const canvas = await html2canvas(hojaRef.current, { scale: 2 })
             const imagen = canvas.toDataURL('image/png')
 
+            /* Si el lienzo supera el límite del dispositivo, toDataURL NO lanza
+               error: devuelve 'data:,' o una cadena vacía. Sin esta comprobación
+               el fallo seguiría siendo invisible, que es justo lo que estamos
+               persiguiendo. */
+            if (!imagen || imagen.length < 100) {
+                throw new Error(
+                    `La captura salió vacía (${canvas.width}×${canvas.height} px). ` +
+                    'Probablemente el móvil no admite una imagen tan grande.',
+                )
+            }
+
             //2. Se crea un PDF A4 vertical, centrado en horizontal y pegado arriba:
             const pdf = new jsPDF('p', 'mm', 'a4')
             const anchoPag = pdf.internal.pageSize.getWidth()
@@ -69,7 +80,19 @@ function DetalleFactura() {
             const blob = pdf.output('blob')
             const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' })
 
-            //4. Se intenta compartir; si no se puede, se descarga.
+            /* 4. Se intenta compartir; si no se puede, se descarga.
+               Los avisos son deliberadamente explícitos: esto se está depurando en
+               un móvil ajeno (Samsung Internet), donde no hay consola que mirar, y
+               el alert es el único canal para saber por dónde ha ido. */
+            const descargar = (motivo) => {
+                pdf.save(nombreArchivo)
+                alert(
+                    `${motivo}\n\n` +
+                    `El PDF se ha descargado como "${nombreArchivo}". ` +
+                    'Búscalo en la carpeta de Descargas del teléfono.',
+                )
+            }
+
             if (navigator.canShare?.({ files: [archivo] })) {
                 try {
                     await navigator.share({ files: [archivo], title: nombreArchivo })
@@ -78,21 +101,27 @@ function DetalleFactura() {
                        pulsación. Generar la imagen y el PDF puede tardar varios
                        segundos en un móvil modesto y, para entonces, el navegador
                        da por consumido el gesto y rechaza con NotAllowedError.
-                       En ese caso se descarga, que no depende del gesto.
                        AbortError = el usuario cerró el menú a propósito: no molestamos. */
                     if (errorCompartir.name === 'AbortError') return
                     console.error('❌ No se pudo compartir, se descarga:', errorCompartir)
-                    pdf.save(nombreArchivo)
+                    descargar(
+                        'No se pudo abrir el menú de compartir ' +
+                        `(${errorCompartir.name}: ${errorCompartir.message}).`,
+                    )
                 }
             } else {
-                pdf.save(nombreArchivo)
+                descargar('Este navegador no permite compartir archivos.')
             }
         } catch (error) {
             /* Sin esto, cualquier fallo (memoria al capturar, un CSS que
                html2canvas no digiera…) dejaba el botón mudo: la promesa se
-               rechazaba y no pasaba nada en pantalla. */
+               rechazaba y no pasaba nada en pantalla. El detalle técnico va en el
+               propio aviso porque en el móvil no hay consola donde leerlo. */
             console.error('❌ Error al exportar el PDF:', error)
-            alert('No se pudo generar el PDF. Inténtalo de nuevo.')
+            alert(
+                'No se pudo generar el PDF.\n\n' +
+                `Detalle: ${error?.name || 'Error'} — ${error?.message || 'sin mensaje'}`,
+            )
         } finally {
             setExportando(false)
         }
