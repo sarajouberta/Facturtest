@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import { camposConfigPendientes, clavesConfigPendientes } from '../utils/configuracion'
 import { numeroDesdeTexto, formatearDecimal } from '../utils/formato'
+import ErrorDatos from '../components/ErrorDatos'
 
 
 function Configuracion() {
@@ -21,7 +22,7 @@ function Configuracion() {
   const [guardado, setGuardado] = useState(false)
 
   //al abrir la pantalla, se cargan los datos guardados (si existen)
-  const config = useConfig()
+  const { config, error: errorConfig } = useConfig()
   useEffect(() => {
     if (config === undefined) return   // aún cargando, nada
     if (config) {
@@ -84,6 +85,16 @@ function Configuracion() {
      no puedan contradecirse. */
   const claseCampo = (clave) =>
     `border rounded px-3 py-2 ${clavesPendientes.includes(clave) ? 'border-red-500' : ''}`
+
+  /* Si falló la lectura no se muestra el formulario: saldría vacío y guardar
+     machacaría los datos buenos que hay en la base con un formulario en blanco. */
+  if (errorConfig) {
+    return (
+      <ErrorDatos error={errorConfig}>
+        No se han podido cargar los datos del taller.
+      </ErrorDatos>
+    )
+  }
 
   return (
     <div className="max-w-md">

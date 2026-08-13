@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useFacturas, useConfig } from '../datos'
 import { filtrarFacturas } from '../utils/busqueda'
+import ErrorDatos from '../components/ErrorDatos'
 
 // Meses para el desplegable: [valor que se compara, nombre que se muestra].
 // El valor ('01'…'12') coincide con lo que hay en la fecha "AAAA-MM-DD".
@@ -13,12 +14,16 @@ const MESES = [
 
 function ListaFacturas() {
   //null = cargado pero sin config;  undefined = todavía cargando
-  const facturas = useFacturas()
-  const config = useConfig()
+  const { facturas, error: errorFacturas } = useFacturas()
+  const { config, error: errorConfig } = useConfig()
   const [texto, setTexto] = useState('')
   const [anio, setAnio] = useState('')
   const [mes, setMes] = useState('')
 
+  // Falló la lectura. Se comprueba ANTES que el "cargando": si no, un error
+  // dejaría la pantalla en "Cargando…" indefinidamente.
+  const error = errorFacturas || errorConfig
+  if (error) return <ErrorDatos error={error}>No se han podido cargar las facturas.</ErrorDatos>
 
   // aún cargando datos de la BD
   if (facturas === undefined || config === undefined) return <p>Cargando…</p>

@@ -70,7 +70,17 @@ export function AuthProvider({ children }) {
         }
     }
 
-    const salir = () => signOut(auth)
+    /* Con su try/catch, como entrar: sin él, un fallo al cerrar sesión sería una
+       rejection no capturada y el botón se quedaría mudo — el mismo patrón que
+       dejó el login sin respuesta en julio. */
+    const salir = async () => {
+        try {
+            await signOut(auth)
+        } catch (e) {
+            console.error('❌ Error al cerrar sesión:', e)
+            alert('No se pudo cerrar la sesión. Inténtalo de nuevo.')
+        }
+    }
 
     return (
         <AuthContext.Provider value={{ usuario, cargando, entrar, salir }}>

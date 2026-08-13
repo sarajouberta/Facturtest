@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useFactura, useConfig, borrarFactura } from '../datos'
 
 import FacturaPDF from '../components/FacturaPDF'
+import ErrorDatos from '../components/ErrorDatos'
 import { calcularManoDeObra } from '../utils/calculos'
 import { formatearHoras } from '../utils/formato'
 import { useRef, useState } from 'react'
@@ -20,11 +21,25 @@ function DetalleFactura() {
        está trabajando, el botón parece muerto y se vuelve a pulsar. */
     const [exportando, setExportando] = useState(false)
 
-    const factura = useFactura(id)
+    const { factura, error: errorFactura } = useFactura(id)
 
-    const config = useConfig()
+    const { config, error: errorConfig } = useConfig()
 
-    if (!factura) return <p>Cargando…</p>
+    // Los tres estados, en orden: primero el fallo, luego el "no existe", y solo
+    // al final el "cargando". Antes los tres caían en el mismo <p>Cargando…</p>.
+    const error = errorFactura || errorConfig
+    if (error) return <ErrorDatos error={error}>No se ha podido cargar la factura.</ErrorDatos>
+
+    if (factura === null) return (
+        <div className="flex flex-col gap-3 items-start">
+            <p>Esa factura ya no existe. Puede que se haya borrado desde otro dispositivo.</p>
+            <button onClick={() => navigate('/')} className="border rounded px-4 py-2">
+                Volver a las facturas
+            </button>
+        </div>
+    )
+
+    if (factura === undefined) return <p>Cargando…</p>
 
     const eliminar = async () => {
         if (confirm(`¿Eliminar la factura ${factura.numero}?`)) {
