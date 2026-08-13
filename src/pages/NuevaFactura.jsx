@@ -10,6 +10,7 @@ import { buscarPorMatricula } from '../utils/busqueda'
 import { limpiarConceptos, limpiarLineasManoDeObra } from '../utils/lineas'
 import { numeroDesdeTexto } from '../utils/formato'
 import { camposConfigPendientes } from '../utils/configuracion'
+import ErrorDatos from '../components/ErrorDatos'
 import {
   calcularTotalMateriales,
   calcularBaseImponible,
@@ -90,8 +91,8 @@ function NuevaFactura() {
   //Los hooks (useFacturas/useConfig) se repintan solos cuando llegan los datos
   //de Firestore, por eso esperamos a que ambos hayan cargado (undefined = aún
   //cargando). config?: cubre el caso de que todavía no haya config guardada.
-  const facturas = useFacturas()
-  const config = useConfig()
+  const { facturas, error: errorFacturas } = useFacturas()
+  const { config, error: errorConfig } = useConfig()
   /* Los valores sugeridos se aplican UNA sola vez. Sin esto, el efecto vuelve a
      ejecutarse cada vez que llegan datos nuevos por onSnapshot (una factura
      guardada desde el móvil, un cambio de configuración desde otro dispositivo)
@@ -139,9 +140,9 @@ function NuevaFactura() {
   // la matrícula (ya está) ni los km (cambian en cada visita).
   const rellenarVehiculoRecurrente = () => {
     if (!vehiculoRecurrente) return
-    setValue('cliente', vehiculoRecurrente.cliente)
-    setValue('vehiculo.vehiculo', vehiculoRecurrente.vehiculo?.vehiculo ?? '')
-    setValue('vehiculo.modelo', vehiculoRecurrente.vehiculo?.modelo ?? '')
+    setValue('cliente', vehiculoRecurrente.cliente, { shouldValidate: true })
+    setValue('vehiculo.vehiculo', vehiculoRecurrente.vehiculo?.vehiculo ?? '', { shouldValidate: true })
+    setValue('vehiculo.modelo', vehiculoRecurrente.vehiculo?.modelo ?? '', { shouldValidate: true })
     setVehiculoRecurrente(null)
   }
 
@@ -177,7 +178,7 @@ function NuevaFactura() {
     const matricula = matriculaParaGuardar(datos.vehiculo?.matricula)
 
     try {
-      await crearFactura({
+      const referencia = await crearFactura({
         ...datos,
         conceptos,
         lineasManoDeObra,
@@ -192,11 +193,26 @@ function NuevaFactura() {
         baseImponible,
         total,
       })
-      navigate('/')
+
+      // Se redirige al detalle de la factura recién creada al guardarse correctamente.
+      navigate(`/factura/${referencia.id}`, { replace: true })
+
     } catch (error) {
       console.error('❌ Error al guardar la factura:', error)
       alert('No se pudo guardar la factura. Revisa la conexión e inténtalo de nuevo.')
     }
+  }
+
+  /* Si falla la lectura no se deja facturar: sin las facturas existentes no se
+     puede calcular el número correlativo ni detectar duplicados, así que se
+     emitiría con un número equivocado. */
+  const errorDatos = errorFacturas || errorConfig
+  if (errorDatos) {
+    return (
+      <ErrorDatos error={errorDatos}>
+        No se han podido cargar los datos necesarios para crear la factura.
+      </ErrorDatos>
+    )
   }
 
   return (

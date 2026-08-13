@@ -5,6 +5,90 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-13 — Al guardar se va al detalle, y el autorrelleno limpia sus avisos
+
+### Guardar lleva a la factura recién creada
+Antes, tras guardar se volvía a la lista y había que buscar la factura para abrirla o imprimirla.
+Ahora se aterriza directamente en su detalle, con el botón de exportar a mano — que es lo que se
+suele querer justo después de crearla.
+
+`crearFactura` ya devolvía el resultado de `addDoc`, y ese resultado es una **referencia al
+documento** con el `id` que Firestore acaba de generar. Bastó con capturarla:
+
+```js
+const referencia = await crearFactura({ … })
+navigate(`/factura/${referencia.id}`, { replace: true })
+```
+
+- *El `.id` importa:* interpolar la referencia entera da una URL inservible, y la pantalla
+  respondería *"Esa factura ya no existe"* — el aviso nuevo funcionando, pero por el motivo
+  equivocado.
+- *El `replace`:* sustituye la entrada del formulario en el historial, así que "atrás" desde el
+  detalle lleva **a la lista** y no a un formulario vacío en el que se podría empezar otra
+  factura sin querer. Mismo motivo que el `replace` del onboarding.
+
+### El autorrelleno dejaba avisos obsoletos
+Al pulsar "Rellenar" tras reconocer la matrícula, seguía saliendo en rojo *"El modelo es
+obligatorio"* con el campo ya relleno.
+
+**`setValue` no revalida por defecto.** Con `mode: 'onTouched'`, pasar por el campo y salir sin
+escribir marca el error; rellenarlo después por código mete el valor pero no vuelve a comprobar
+nada, así que el error guardado se queda ahí, ya falso. Se arregla con la opción
+`{ shouldValidate: true }` en los tres `setValue` de `rellenarVehiculoRecurrente`.
+
+Como el primero asigna el objeto `cliente` entero, RHF valida también sus campos internos y el
+aviso del DNI se limpia solo.
+
+---
+
+## 2026-08-13 — Los errores de lectura dejan de ser invisibles
+
+Auditoría del manejo de errores antes de meter mano a *editar factura*. Resultado: **las
+escrituras estaban bien cubiertas, las lecturas no**.
+
+Todo lo que escribe (crear factura, borrar, guardar configuración), el login, la exportación del
+PDF, el Error Boundary y el respaldo de `index.html` ya tenían su red. Pero los tres hooks de
+`datos.js` hacían esto:
+
+```js
+onSnapshot(ref, (snap) => {…}, (error) => console.error('❌ Firestore:', error))
+```
+
+El error se registraba **y ahí moría**: el estado se quedaba en `undefined` y las pantallas
+interpretan `undefined` como "cargando". O sea que un rechazo de las reglas o un fallo de lectura
+dejaba un **"Cargando…" eterno**, sin explicación y sin forma de reintentar — y el motivo solo
+existía en una consola que en un móvil no está a mano.
+
+### Los hooks devuelven ahora `{ dato, error }`
+Un dato ausente y un fallo dejan de ser lo mismo. Estados del dato: `undefined` → cargando ·
+`null` → no existe · valor → cargado. Y `error` aparte.
+
+**`useFactura` gana el `null`**: antes devolvía `undefined` tanto al cargar como cuando el
+documento no existía, así que abrir una factura borrada —o tenerla abierta mientras se borra
+desde el otro dispositivo— colgaba la pantalla para siempre. Es el mismo truco del `null`
+explícito que `useConfig` ya usaba desde el onboarding; a `useFactura` se le había pasado.
+
+### Componente `ErrorDatos`
+Usado en las cuatro pantallas: mensaje, detalle técnico del error y **botón de reintentar**. Eso
+último no existía en ningún sitio — ante cualquier fallo, la única salida era cerrar la app.
+
+**Se bloquea la pantalla, no se degrada,** en dos casos y a propósito:
+- **Nueva factura:** sin las facturas existentes no se puede calcular el correlativo ni detectar
+  duplicados; se emitiría con un número posiblemente repetido, que es un problema legal.
+- **Configuración:** el formulario saldría vacío y guardar machacaría los datos buenos.
+
+### Otros
+- `salir` (cerrar sesión) no tenía `catch`: era una *rejection* no capturada, el mismo patrón que
+  dejó mudo el botón de entrar en julio.
+
+### Nota para probarlo
+**El modo "sin conexión" del navegador NO sirve** para provocar el error: con `persistentLocalCache`
+activo, Firestore sirve la copia local y `onSnapshot` no falla. Hay que provocar un
+`permission-denied` (apuntando temporalmente a una ruta que las reglas no permitan). El caso de
+"factura inexistente" sí se prueba fácil: cambiar el id en la URL.
+
+---
+
 ## 2026-08-13 — Logo del taller en la factura, y avisos del exportador
 
 ### El logo
@@ -39,6 +123,23 @@ código como valor por defecto, y el subido con prioridad.*
 así que **el logo solo se ve en el PDF exportado**, nunca en la pantalla de detalle. Se perdió el
 tiempo cambiando código que ya era correcto. *Lección: antes de tocar nada, verificar qué está
 mirando el usuario y qué está ejecutando el navegador.*
+
+### Campos opcionales vacíos
+En la factura salían **etiquetas huérfanas** (`Km:` sin cifra, `Tlf.:` sin número), renglones en
+blanco donde faltaba el domicilio, y un `km` suelto en la pantalla de detalle. Los opcionales
+pasan a pintarse solo si tienen contenido, con **renderizado condicional** (`{valor && <…>}`:
+si el valor está vacío, React no pinta nada).
+
+Localidad y provincia se unen con `filter(Boolean).join(' ')`, que descarta las vacías y no deja
+el espacio suelto que quedaba antes con `{localidad} {provincia}`.
+
+Los campos **obligatorios** (nombre, DNI/CIF, modelo, marca, matrícula) se dejan sin condición a
+propósito: si faltaran en una factura antigua, es mejor ver el hueco que ocultarlo — es un
+documento legal.
+
+*Ojo para el futuro:* con un `0` **numérico**, `{valor && …}` pintaría un `0` suelto en pantalla
+(el cero es falsy, pero React sí lo muestra). Aquí no ocurre porque estos campos se guardan como
+texto.
 
 ### Los avisos del exportador, mejor calibrados
 El aviso que se añadió para depurar el móvil saltaba **también en el escritorio**, diciendo además
