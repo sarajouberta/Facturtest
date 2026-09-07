@@ -40,7 +40,7 @@ Comandos (en `package.json`): `npm run dev` (desarrollo), `npm run build` (produ
 | Tecnología | Para qué | Dónde se usa |
 |---|---|---|
 | **React Router** (`react-router-dom`) | Navegar entre pantallas sin recargar (`/`, `/nueva-factura`, `/configuracion`). Piezas: `<Routes>`, `<Route>`, `<Link>`, `useNavigate`. | `main.jsx`, `App.jsx` |
-| **Tailwind CSS** | Estilos mediante clases de utilidad (`flex`, `border`, `text-blue-600`...) en el JSX. | En el `className` de los componentes |
+| **Tailwind CSS** | Estilos mediante clases de utilidad (`flex`, `border`, `text-marca`...) en el JSX. Los colores de la marca y la fuente de rótulo se declaran como tokens en `@theme`. | `src/index.css`, `className` de los componentes |
 
 ## Datos y formularios
 

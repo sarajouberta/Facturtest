@@ -5,6 +5,93 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-20 — Ajustes de interfaz: móvil, centrado y respuesta al tocar
+
+### Las líneas no cabían en el móvil
+Materiales y mano de obra pintaban cinco columnas en una sola fila con anchos fijos: unos 320 px
+solo de números, que en una pantalla de 390 px no caben. Se desbordaba a lo ancho.
+
+Ahora, por debajo de 640 px, la línea se parte en dos: la descripción ocupa el ancho completo y
+los números van juntos debajo. La cabecera de columnas se oculta ahí (no cuadraría con nada) y en
+su lugar **cada campo lleva su etiqueta**, que desaparece en pantalla grande. Así se mantiene lo
+acordado en agosto: en ningún tamaño puede haber casillas sin nombre.
+
+Dos detalles que lo hacen funcionar: **`min-w-0`** en el campo de descripción, porque un input se
+niega a encogerse por debajo de su ancho natural y sin eso desborda igual; y **`items-end`** en
+la fila de números, para que las etiquetas empujen hacia abajo sin descuadrar el importe ni la ✕.
+
+### El contenido se centra
+Los cuatro contenedores de página llevaban `max-w-*` pero **no `mx-auto`**, así que el bloque se
+pegaba a la izquierda y los 224 px que sobraban se iban todos al lado derecho. En el móvil no se
+veía, porque ahí el contenido llena la pantalla.
+
+### Respuesta al pulsar y al escribir
+En `index.css`, para toda la app en vez de botón por botón:
+
+- **Botones:** encogen un 4 % mientras se mantienen pulsados (`:active`, que en el móvil es lo
+  único que hay: no existe el paso del ratón por encima). Los deshabilitados no responden, para
+  que "Generando PDF…" no parezca que acepta pulsaciones.
+- **Campos:** al enfocarlos se tiñe el borde y se enciende un resplandor, con transición de
+  150 ms. Se usa `box-shadow` y no un borde más grueso porque la sombra **no ocupa espacio**: en
+  las filas apretadas, engordar el borde daría un salto cada vez que se cambia de casilla.
+- Ambos respetan **`prefers-reduced-motion`**, la preferencia del sistema de quien pide menos
+  animaciones.
+
+Antes no había ningún estilo de foco propio, así que se veía el del navegador de turno.
+
+### Pasada de diseño con la identidad de ASTURTEST
+Los colores salen del **icono de la app**, que en su día se generó desde la tarjeta del taller, en
+lugar de inventarlos: rojo `#d31e1e`, negro `#141414`, gris `#8c8c8c` y amarillo `#f7d000`. Van
+como tokens en `index.css` (`@theme`), así que Tailwind genera sus utilidades y el color sale de
+un solo sitio.
+
+- **Cabecera:** fondo blanco con el logo del taller, el nombre en rojo y un filete rojo grueso
+  abajo. Se descartó una banda roja de fondo: competiría con los avisos de la app, que también
+  usan color para significar algo.
+- **Menú:** de enlaces separados por barras verticales a pestañas con `NavLink`, que sabe cuál es
+  la ruta activa. Antes no había forma de saber en qué pantalla estabas.
+- **Botones:** rojo para las acciones principales (Guardar, Nueva, Entrar), **amarillo** para
+  Editar, **gris oscuro** para Exportar y rojo de peligro para Eliminar. Guardar y Eliminar son
+  los dos rojos pero **nunca coinciden en la misma pantalla**. El verde de Exportar se fue porque
+  no pertenecía a la identidad.
+- **Fondo** con un degradado casi imperceptible hacia el rojo, y las **franjas diagonales** del
+  icono en la esquina inferior, hechas con un `linear-gradient` (sin imagen que descargar).
+- `theme_color` de la PWA al rojo de marca.
+- **Se mantiene la convención de los avisos** (azul información, amarillo advertencia, verde
+  confirmación, rojo error): se leen sin pensar, y pasarlos a colores de marca los haría más
+  bonitos y menos claros.
+
+*Sobre el contraste:* el amarillo obliga a texto oscuro (blanco sobre `#f7d000` da 1,7 a 1,
+ilegible; negro da 13 a 1). Y el gris claro del logo con texto blanco se quedaba en 3,36, por
+debajo del mínimo de 4,5, así que Exportar usa el gris oscuro, que llega a 5,02.
+
+### Tipografía propia, empaquetada
+El título de la cabecera usa **Oswald** (condensada, licencia SIL Open Font), **incluida en el
+build** y no enlazada desde Google Fonts: la app se usa en un taller sin cobertura, y una fuente
+enlazada no cargaría justo donde hace falta. Procedencia y licencia en
+`src/assets/fuentes/LEEME.txt`, como pide la OFL.
+
+**Y ahí apareció un fallo que venía de antes:** el service worker **no precacheaba la fuente**. El
+plugin solo guarda por defecto `js, css, html, ico, png, svg`, así que los `woff2` se quedaban
+fuera y sin conexión se habría visto la letra de repuesto. Se añade `globPatterns` en
+`vite.config.js` con `woff2` incluido.
+
+El precache pasó de **10 a 17 entradas**: no solo faltaba la fuente, también otros archivos que ya
+estaban en el proyecto. O sea que el arreglo mejora el funcionamiento sin conexión más allá de la
+tipografía.
+
+### Nota de proceso
+La pasada se hizo dos veces. En el primer intento el código era correcto —las utilidades y el
+color estaban en el CSS compilado, se comprobó— pero **nunca llegó a verse en el navegador**: al
+borrar `App.css` mientras `App.jsx` todavía lo importaba, el servidor de desarrollo se quedó en
+error y hubo que revertirlo todo.
+
+*Lección:* cambiar primero quien importa y borrar después. Y ante un "no veo el cambio",
+comprobar **qué está ejecutando el navegador** antes de seguir tocando código.
+
+
+---
+
 ## 2026-08-20 — Los importes se muestran en formato español
 
 Detectado al editar una factura: el campo decía `46,50` y el total de la misma pantalla decía
