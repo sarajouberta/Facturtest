@@ -14,6 +14,10 @@ export default defineConfig({
         //El service worker NO debe secuestrar las rutas de login de Firebase:
         //si responde con el index.html cacheado, la redirección nunca llega a Google.
         navigateFallbackDenylist: [/^\/__\/auth\//],
+        /* Por defecto el plugin solo precachea js, css, html, ico, png y svg:
+           los woff2 se quedaban fuera y la fuente de la cabecera no cargaría sin
+           conexión, que es justo para lo que se empaquetó. */
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
       manifest: {
         name: 'Facturtest',

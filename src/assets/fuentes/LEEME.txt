@@ -1,0 +1,10 @@
+Oswald
+Copyright (c) 2016 The Oswald Project Authors
+Licencia: SIL Open Font License, version 1.1
+https://openfontlicense.org
+
+Archivo: oswald-latin.woff2 (subconjunto latino, peso 600, descargado de Google Fonts)
+
+Se empaqueta con la app en lugar de enlazarla desde Google Fonts para que
+funcione sin conexión: Facturtest se usa en un taller donde la cobertura falla,
+y una fuente enlazada no cargaría. La licencia OFL permite esta redistribución.
