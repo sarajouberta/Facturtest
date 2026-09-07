@@ -45,6 +45,7 @@ function App() {
             <Route path="/" element={<ListaFacturas />} />
             <Route path="/nueva-factura" element={<NuevaFactura />} />
             <Route path="/factura/:id" element={<DetalleFactura />} />
+            <Route path="/factura/:id/editar" element={<NuevaFactura />} />
             <Route path="/configuracion" element={<Configuracion />} />
           </Routes>
         )}

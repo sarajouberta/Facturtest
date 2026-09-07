@@ -293,6 +293,10 @@ function DetalleFactura() {
                 <button onClick={() => navigate('/')} className="border rounded px-4 py-2">
                     Volver
                 </button>
+                <button onClick={() => navigate(`/factura/${factura.id}/editar`)}
+                    className="bg-blue-600 text-white rounded px-4 py-2">
+                    Editar
+                </button>
                 <button onClick={exportarPDF} disabled={exportando}
                     className="bg-green-600 text-white rounded px-4 py-2 disabled:opacity-60">
                     {exportando ? 'Generando PDF…' : 'Exportar PDF'}

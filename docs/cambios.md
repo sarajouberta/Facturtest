@@ -5,6 +5,73 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-20 — Editar factura
+
+Hasta ahora una factura, una vez creada, no se podía tocar: una errata en la matrícula obligaba a
+borrarla y rehacerla entera.
+
+### Un solo formulario para crear y para editar
+`NuevaFactura` atiende ahora dos rutas: `/nueva-factura` y `/factura/:id/editar`. El modo se
+deduce de si la URL trae un id.
+
+*Por qué reutilizar el componente y no hacer uno nuevo:* de sus 612 líneas, unas 395 son el
+marcado del formulario, **idéntico** en los dos modos. Duplicarlo habría dejado dos pantallas que
+mantener a la vez, con el riesgo de arreglar una y olvidar la otra.
+
+Lo que cambia entre modos es poco y está localizado:
+- No se sugiere número correlativo ni se prerrellena el IVA ni la tarifa (se conservan los de la
+  factura).
+- `numeroYaUsado` recibe el id para **excluir la propia factura**. Sin eso, la validación se
+  encontraría a sí misma y diría "ya existe una factura con ese número" cada vez que se guarda.
+  El parámetro `idActual` se añadió el 07/08 pensando precisamente en esto.
+- No se ofrece el autorrelleno por matrícula: los datos ya están puestos y, como la factura está
+  en la lista, se ofrecería rellenarla consigo misma.
+
+### Qué se puede editar y qué no
+Editable el **contenido del trabajo**: cliente, vehículo, materiales, mano de obra y trabajos
+realizados. Bloqueados **número, fecha e IVA**, que son los que identifican y cuantifican la
+factura dentro de la serie correlativa. Si están mal, lo correcto es borrarla y emitir otra.
+
+*(Los datos del taller nunca han sido editables desde aquí: el PDF los lee en vivo de la
+configuración, no se guardan dentro del documento.)*
+
+**Los campos bloqueados van `readOnly`, nunca `disabled`.** Un campo deshabilitado **no se envía
+con el formulario**: React Hook Form no lo incluiría en los datos y la factura se guardaría sin
+número, sin fecha y sin IVA.
+
+### `facturaAFormulario` (utils/lineas.js)
+La inversa de `limpiarConceptos` y `limpiarLineasManoDeObra`: aquéllas convierten lo tecleado en
+datos para guardar, ésta convierte lo guardado en algo editable. Hace tres cosas:
+
+1. **Formatea los números.** Importes y horas se guardan como número (`46.5`) pero sus campos son
+   de texto para admitir la coma. Sin esto se vería `46.5` y `0.8` en vez de `46,50` y `0,80`, el
+   mismo problema que ya apareció con la tarifa en Configuración.
+2. **Convierte las facturas antiguas.** Las anteriores al 07/08 guardan la mano de obra como un
+   importe único, sin líneas. Al editarlas, el desglose saldría vacío y **al guardar el importe se
+   recalcularía a 0**, perdiendo dinero de una factura ya emitida. Se convierten en una sola línea
+   de 1 hora a ese precio, de modo que el total no cambia.
+   - Se valoró bloquear la edición de esas facturas. Se descartó porque cuesta lo mismo (ocultar
+     el botón **y** proteger la ruta) y porque **no se pueden inspeccionar**: el titular entra con
+     su propia cuenta de Google, así que sus facturas viven en otra rama de Firestore. Cuando dos
+     opciones cuestan igual y una no puede perder datos, se elige esa.
+3. **Descarta el `id`**, que lo añade `useFactura` al leer y no es un campo del documento.
+
+El orden de los tres casos de la mano de obra importa: una factura nueva **también** tiene
+`manoDeObra` (se guarda el total calculado), así que preguntar antes por el importe le añadiría la
+línea de conversión además de las suyas y duplicaría el total. Hay un test que lo fija.
+
+### Otros detalles
+- `actualizarFactura(id, datos)` en `datos.js`, con **`setDoc`** y no `updateDoc`: reemplaza el
+  documento entero, que es lo que se quiere: si se borran todas las líneas de materiales, tienen
+  que desaparecer de verdad.
+- La factura se vuelca en el formulario **una sola vez**, con una bandera en `useRef`. `useFactura`
+  escucha con `onSnapshot`, así que sin la bandera cualquier cambio volvería a dispararlo y
+  machacaría lo que se estuviera escribiendo. Mismo motivo que `sugerenciasAplicadas`.
+
+Tests: de 107 a **114**.
+
+---
+
 ## 2026-08-13 — Al guardar se va al detalle, y el autorrelleno limpia sus avisos
 
 ### Guardar lleva a la factura recién creada

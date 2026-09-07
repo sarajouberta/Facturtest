@@ -6,7 +6,7 @@
   import { auth, firestore } from './firebase'
   import { useAuth } from './auth/AuthContext'
   
-  // --- Referencias: dónde viven los datos de un usuario ---
+  // ---Referencias: dónde viven los datos de un usuario : atajos para direcciones ampliamente repetidas---
   const refFacturas = (uid) => collection(firestore, 'users', uid, 'facturas')
   const refConfig = (uid) => doc(firestore, 'users', uid, 'config', 'taller')
 
@@ -17,21 +17,22 @@
     return u.uid
   }
 
-// --- LECTURA: hooks que se repintan solos (como useLiveQuery) ---
+// ---LECTURA: hooks que se repintan solos (como useLiveQuery) ---
 
 /*Nota: custom hook: fabricar personalizados juntando los de React (ej.useFacturas(): por dentro combina useAuth + useState + useEffect, y por fuera se usa como uno más)
   const facturas = useFacturas()   //una línea, y se repinta solo
   La convención use: es lo que le dice a React (y al linter) "esto es un hook, hazle cumplir las reglas de arriba".
 
  */
-  /* Los tres hooks devuelven { dato, error }. El error hace falta porque, si solo
-     se devolviera el dato, un fallo de Firestore sería indistinguible de "todavía
-     cargando": el estado se quedaba en undefined, la pantalla mostraba "Cargando…"
-     para siempre y el motivo solo aparecía en la consola — que en un móvil no
-     existe. Estados posibles del dato:
-       undefined → cargando  |  null → no existe  |  valor → dato cargado  */
+/* Los tres hooks devuelven { dato, error }. El error hace falta porque, si solo
+  se devolviera el dato, un fallo de Firestore sería indistinguible de "todavía
+  cargando": el estado se quedaba en undefined, la pantalla mostraba "Cargando…"
+  para siempre y el motivo solo aparecía en la consola — que en un móvil no
+  existe. Estados posibles del dato:
+    undefined -> cargando  |  null -> no existe  |  valor -> dato cargado  
+  */
 
-  // Todas las facturas del usuario.
+// Todas las facturas del usuario.
   export function useFacturas() {
     const { usuario } = useAuth()
     const [facturas, setFacturas] = useState(undefined)
@@ -98,11 +99,22 @@
     return { config, error }
   }
 
-  // --- ESCRITURA: acciones ---
+  // ---ESCRITURA: acciones ---
+
+  /* Nota: Firestore es un árbol que alterna colecciones y documentos
+  (ej: Users (colección)->  un usuario (uid: documento) -> una colección (facturas) -> un documento (id de una factura) 
+  (Truco: Coleccion = impar, documento = par)
+  IMPORTANTE: las referencias son direcciones, no los datos (doc (...) y collection(...) construyen la referencia, no el objeto en sí (como hacer new File en java*/
 
   export function crearFactura(datos) {
     return addDoc(refFacturas(uidActual()), datos)
   }
+
+  export function actualizarFactura(id, datos) {
+    return setDoc(doc(firestore, 'users', uidActual(), 'facturas', id), datos)  //reemplaza doc entero: no update
+  }
+
+
 
   export function borrarFactura(id) {
     return deleteDoc(doc(firestore, 'users', uidActual(), 'facturas', id))

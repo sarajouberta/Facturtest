@@ -1,13 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { useForm, useFieldArray } from 'react-hook-form'
-import { useNavigate, Link } from 'react-router-dom'
-import { useFacturas, useConfig, crearFactura } from '../datos'
+import { useNavigate, Link, useParams } from 'react-router-dom'
+import { useFacturas, useConfig, useFactura, crearFactura, actualizarFactura } from '../datos'
 
 import { generarSiguienteNumero, numeroYaUsado } from '../utils/numeracion'
 import { nifValido, telefonoValido } from '../utils/validaciones'
 import { matriculaParaGuardar } from '../utils/matricula'
 import { buscarPorMatricula } from '../utils/busqueda'
-import { limpiarConceptos, limpiarLineasManoDeObra } from '../utils/lineas'
+import { limpiarConceptos, limpiarLineasManoDeObra, facturaAFormulario } from '../utils/lineas'
 import { numeroDesdeTexto } from '../utils/formato'
 import { camposConfigPendientes } from '../utils/configuracion'
 import ErrorDatos from '../components/ErrorDatos'
@@ -20,7 +20,7 @@ import {
 } from '../utils/calculos'
 
 function NuevaFactura() {
-  const { register, control, handleSubmit, watch, setValue, getValues, setError,
+  const { register, control, handleSubmit, watch, setValue, getValues, reset, setError,
     formState: { errors } } = useForm({
       /* onTouched: cada campo se valida al salir de él por primera vez, y a partir
          de ahí mientras se escribe. Por defecto RHF solo valida al enviar, así que
@@ -69,6 +69,18 @@ function NuevaFactura() {
   const navigate = useNavigate()
   const [vehiculoRecurrente, setVehiculoRecurrente] = useState(null)
 
+  /* Un mismo formulario para crear y para editar: si la URL trae un id
+     (/factura/:id/editar) estamos editando esa factura. */
+  const { id } = useParams()
+  const modoEdicion = Boolean(id)
+  const { factura, error: errorFactura } = useFactura(id)
+
+  /* Al editar, los campos que identifican la factura se muestran pero no se
+     tocan. readOnly y no disabled: un campo deshabilitado no se envía con el
+     formulario, y la factura se guardaría sin número, sin fecha y sin IVA. */
+  const claseCampo = () =>
+    `border rounded px-3 py-2 ${modoEdicion ? 'bg-gray-100 text-gray-600' : ''}`
+
   // Valores observados en vivo para calcular los totales
   const conceptos = watch('conceptos')
   const lineasManoDeObra = watch('lineasManoDeObra')
@@ -93,6 +105,7 @@ function NuevaFactura() {
   //cargando). config?: cubre el caso de que todavía no haya config guardada.
   const { facturas, error: errorFacturas } = useFacturas()
   const { config, error: errorConfig } = useConfig()
+  
   /* Los valores sugeridos se aplican UNA sola vez. Sin esto, el efecto vuelve a
      ejecutarse cada vez que llegan datos nuevos por onSnapshot (una factura
      guardada desde el móvil, un cambio de configuración desde otro dispositivo)
@@ -101,6 +114,7 @@ function NuevaFactura() {
   const sugerenciasAplicadas = useRef(false)
 
   useEffect(() => {
+    if (modoEdicion) return   // al editar se conservan el número y el IVA de la factura
     if (facturas === undefined || config === undefined) return   // esperamos a que carguen
     if (sugerenciasAplicadas.current) return
     sugerenciasAplicadas.current = true
@@ -120,23 +134,37 @@ function NuevaFactura() {
         }
       })
     }
-  }, [facturas, config, setValue, getValues])
+  }, [modoEdicion, facturas, config, setValue, getValues])
+
+  /* Se vuelca una sola vez, con la misma bandera de useRef que las sugerencias:
+     useFactura escucha con onSnapshot, así que cualquier cambio en la factura
+     volvería a dispararlo y machacaría lo que se esté escribiendo. */
+  const facturaVolcada = useRef(false)
+
+  useEffect(() => {
+    if (!modoEdicion || facturaVolcada.current || !factura) return
+    facturaVolcada.current = true
+    reset(facturaAFormulario(factura))
+  }, [modoEdicion, factura, reset])
 
   /* Datos del taller que faltan por rellenar. Mientras la config carga (undefined)
      no se avisa de nada, para que no parpadee el aviso al abrir la pantalla. */
   const pendientesConfig = config === undefined ? [] : camposConfigPendientes(config)
 
-  // register de la matrícula en una variable para poder encadenar su onBlur
+  //Register de la matrícula en una variable para poder encadenar su onBlur
   // (validación de RHF) con nuestra búsqueda de vehículo recurrente.
   const matriculaReg = register('vehiculo.matricula', { required: 'La matrícula es obligatoria' })
 
-  // Al salir del campo matrícula, buscamos si ese vehículo ya existe en facturas
+  //Al salir del campo matrícula, buscamos si ese vehículo ya existe en facturas
   // anteriores, para ofrecer rellenar sus datos (cliente recurrente).
   const buscarVehiculo = (matricula) => {
+    /* Al editar no se ofrece: los datos ya están puestos y, como la propia
+       factura está en la lista, se ofrecería rellenarla consigo misma. */
+    if (modoEdicion) return
     setVehiculoRecurrente(buscarPorMatricula(facturas ?? [], matricula))
   }
 
-  // Rellena cliente y marca/modelo con los de la factura encontrada. No tocamos
+  //Rellena cliente y marca/modelo con los de la factura encontrada. No tocamos
   // la matrícula (ya está) ni los km (cambian en cada visita).
   const rellenarVehiculoRecurrente = () => {
     if (!vehiculoRecurrente) return
@@ -178,7 +206,7 @@ function NuevaFactura() {
     const matricula = matriculaParaGuardar(datos.vehiculo?.matricula)
 
     try {
-      const referencia = await crearFactura({
+      const datosFactura = {
         ...datos,
         conceptos,
         lineasManoDeObra,
@@ -192,10 +220,16 @@ function NuevaFactura() {
         manoDeObra,
         baseImponible,
         total,
-      })
+      }
 
-      // Se redirige al detalle de la factura recién creada al guardarse correctamente.
-      navigate(`/factura/${referencia.id}`, { replace: true })
+      // Se redirige al detalle de la factura al guardarse correctamente.
+      if (modoEdicion) {
+        await actualizarFactura(id, datosFactura)
+        navigate(`/factura/${id}`, { replace: true })
+      } else {
+        const referencia = await crearFactura(datosFactura)
+        navigate(`/factura/${referencia.id}`, { replace: true })
+      }
 
     } catch (error) {
       console.error('❌ Error al guardar la factura:', error)
@@ -206,7 +240,7 @@ function NuevaFactura() {
   /* Si falla la lectura no se deja facturar: sin las facturas existentes no se
      puede calcular el número correlativo ni detectar duplicados, así que se
      emitiría con un número equivocado. */
-  const errorDatos = errorFacturas || errorConfig
+  const errorDatos = errorFacturas || errorConfig || errorFactura
   if (errorDatos) {
     return (
       <ErrorDatos error={errorDatos}>
@@ -215,10 +249,30 @@ function NuevaFactura() {
     )
   }
 
+  // Al editar hay que esperar a la factura, y contemplar que ya no exista.
+  if (modoEdicion && factura === null) {
+    return (
+      <div className="flex flex-col gap-3 items-start">
+        <p>Esa factura ya no existe. Puede que se haya borrado desde otro dispositivo.</p>
+        <button onClick={() => navigate('/')} className="border rounded px-4 py-2">
+          Volver a las facturas
+        </button>
+      </div>
+    )
+  }
+  if (modoEdicion && factura === undefined) return <p>Cargando…</p>
+
   return (
     <div className="max-w-2xl">
-      <h2 className="text-xl font-bold mb-1">Nueva factura</h2>
+      <h2 className="text-xl font-bold mb-1">{modoEdicion ? 'Editar factura' : 'Nueva factura'}</h2>
       <p className="text-sm text-gray-500 mb-4">Los campos con * son obligatorios.</p>
+
+      {modoEdicion && (
+        <p className="bg-blue-50 text-blue-800 border border-blue-200 rounded p-3 mb-4 text-sm">
+          El número, fecha e IVA no se pueden editar. Si hay un error, eliminar la
+          factura y crear una nueva.
+        </p>
+      )}
 
       {/* Avisa, pero no bloquea: se puede facturar rellenando los datos a mano */}
       {pendientesConfig.length > 0 && (
@@ -237,13 +291,13 @@ function NuevaFactura() {
           <legend className="font-semibold px-1">Factura</legend>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-bold">Número *</span>
-            <input type="number" min="1" className="border rounded px-3 py-2"
+            <input type="number" min="1" className={claseCampo()} readOnly={modoEdicion}
               {...register('numero', {
                 required: 'El número es obligatorio',
                 // El número se sugiere solo, pero es editable: hay que comprobar
                 // que no se repita. Dos facturas con el mismo número no son válidas.
                 validate: (valor) =>
-                  !numeroYaUsado(facturas, valor) || 'Ya existe una factura con ese número',
+                  !numeroYaUsado(facturas, valor, id) || 'Ya existe una factura con ese número',
               })}
             />
             {errors.numero && (
@@ -252,7 +306,7 @@ function NuevaFactura() {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-sm font-bold">Fecha *</span>
-            <input type="date" className="border rounded px-3 py-2"
+            <input type="date" className={claseCampo()} readOnly={modoEdicion}
               {...register('fecha', { required: 'La fecha es obligatoria' })} />
             {errors.fecha && (
               <span className="text-red-600 text-sm">{errors.fecha.message}</span>
@@ -553,7 +607,8 @@ function NuevaFactura() {
               type="number"
               min="0"
               max="100"
-              className="border rounded px-3 py-2"
+              className={claseCampo()}
+              readOnly={modoEdicion}
               {...register('iva', {
                 valueAsNumber: true,
                 min: { value: 0, message: 'El IVA debe estar entre 0 y 100' },
@@ -587,7 +642,7 @@ function NuevaFactura() {
           className="bg-blue-600 text-white rounded px-4 py-2 font-medium 
   self-start"
         >
-          Guardar factura
+          {modoEdicion ? 'Guardar cambios' : 'Guardar factura'}
         </button>
       </form>
     </div>
