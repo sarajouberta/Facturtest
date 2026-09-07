@@ -1,6 +1,6 @@
 import { Routes, Route, Link } from 'react-router-dom'
 import ListaFacturas from './pages/ListaFacturas'
-import NuevaFactura from './pages/NuevaFactura'
+import FormularioFactura from './pages/FormularioFactura'
 import Configuracion from './pages/Configuracion'
 import './App.css'
 import DetalleFactura from './pages/DetalleFactura'
@@ -43,9 +43,9 @@ function App() {
         ) : (
           <Routes>
             <Route path="/" element={<ListaFacturas />} />
-            <Route path="/nueva-factura" element={<NuevaFactura />} />
+            <Route path="/nueva-factura" element={<FormularioFactura />} />
             <Route path="/factura/:id" element={<DetalleFactura />} />
-            <Route path="/factura/:id/editar" element={<NuevaFactura />} />
+            <Route path="/factura/:id/editar" element={<FormularioFactura />} />
             <Route path="/configuracion" element={<Configuracion />} />
           </Routes>
         )}

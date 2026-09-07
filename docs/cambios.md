@@ -36,8 +36,11 @@ Hasta ahora una factura, una vez creada, no se podía tocar: una errata en la ma
 borrarla y rehacerla entera.
 
 ### Un solo formulario para crear y para editar
-`NuevaFactura` atiende ahora dos rutas: `/nueva-factura` y `/factura/:id/editar`. El modo se
-deduce de si la URL trae un id.
+El componente atiende ahora dos rutas: `/nueva-factura` y `/factura/:id/editar`. El modo se
+deduce de si la URL trae un id. Como ya no es solo "nueva", el archivo pasa a llamarse
+**`FormularioFactura.jsx`** (renombrado con `git mv`, en un commit aparte para que el cambio
+funcional se lea limpio). Las entradas anteriores de este diario siguen hablando de
+`NuevaFactura.jsx`: eran correctas cuando se escribieron y no se reescriben.
 
 *Por qué reutilizar el componente y no hacer uno nuevo:* de sus 612 líneas, unas 395 son el
 marcado del formulario, **idéntico** en los dos modos. Duplicarlo habría dejado dos pantallas que

@@ -19,7 +19,7 @@ import {
   calcularTotalManoDeObra,
 } from '../utils/calculos'
 
-function NuevaFactura() {
+function FormularioFactura() {
   const { register, control, handleSubmit, watch, setValue, getValues, reset, setError,
     formState: { errors } } = useForm({
       /* onTouched: cada campo se valida al salir de él por primera vez, y a partir
@@ -648,7 +648,7 @@ function NuevaFactura() {
   )
 }
 
-export default NuevaFactura
+export default FormularioFactura
 
 
 /*Modificaciones tras obtener modelo de factura en papel:

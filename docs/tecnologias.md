@@ -49,7 +49,7 @@ Comandos (en `package.json`): `npm run dev` (desarrollo), `npm run build` (produ
 | **Cloud Firestore** (`firebase/firestore`) | Base de datos en la nube, sincronizada entre dispositivos y con copia local para trabajar sin internet. `addDoc()`, `setDoc()`, `deleteDoc()`, `onSnapshot()`. | `datos.js` (toda la app pasa por ahí) |
 | **Firebase Auth** (`firebase/auth`) | Login con Google. Da el `uid` del que cuelgan todos los datos. | `firebase.js`, `auth/AuthContext.jsx` |
 | **Hooks propios** (`useFacturas`, `useFactura`, `useConfig`) | Las pantallas se actualizan solas al cambiar los datos: envuelven `onSnapshot` en `useState` + `useEffect`. | `datos.js` |
-| **React Hook Form** | Gestión de formularios. Piezas: `useForm`, `register`, `handleSubmit`, `watch`, `setValue`, y `useFieldArray` para líneas dinámicas. | `NuevaFactura.jsx`, `Configuracion.jsx` |
+| **React Hook Form** | Gestión de formularios. Piezas: `useForm`, `register`, `handleSubmit`, `watch`, `setValue`, y `useFieldArray` para líneas dinámicas. | `FormularioFactura.jsx`, `Configuracion.jsx` |
 
 ## Generación de PDF
 
