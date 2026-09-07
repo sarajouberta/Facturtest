@@ -23,3 +23,11 @@ export function numeroDesdeTexto(valor) {
     if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0
     return Number(String(valor ?? '').trim().replace(',', '.')) || 0
 }
+
+/* Un importe en euros con el formato español: 46.5 pasa a ser '46,50 €'.
+   Se centraliza aquí para que los decimales y el símbolo sean iguales en toda la
+   app. Ojo con toFixed(2): devuelve SIEMPRE punto decimal, sin mirar el idioma,
+   así que no vale para mostrar dinero en español. */
+export function formatearEuros(valor) {
+    return `${formatearDecimal(valor)} €`
+}

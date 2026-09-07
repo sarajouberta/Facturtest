@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useFacturas, useConfig } from '../datos'
 import { filtrarFacturas } from '../utils/busqueda'
+import { formatearEuros } from '../utils/formato'
 import ErrorDatos from '../components/ErrorDatos'
 
 // Meses para el desplegable: [valor que se compara, nombre que se muestra].
@@ -103,7 +104,7 @@ function ListaFacturas() {
                     {f.cliente?.nombre} · {f.vehiculo?.matricula} · {f.fecha}
                   </div>
                 </div>
-                <div className="font-bold">{f.total.toFixed(2)} €</div>
+                <div className="font-bold">{formatearEuros(f.total)}</div>
               </Link>
             </li>
           ))}

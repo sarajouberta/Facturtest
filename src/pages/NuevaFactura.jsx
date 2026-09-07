@@ -8,7 +8,7 @@ import { nifValido, telefonoValido } from '../utils/validaciones'
 import { matriculaParaGuardar } from '../utils/matricula'
 import { buscarPorMatricula } from '../utils/busqueda'
 import { limpiarConceptos, limpiarLineasManoDeObra, facturaAFormulario } from '../utils/lineas'
-import { numeroDesdeTexto } from '../utils/formato'
+import { numeroDesdeTexto, formatearEuros } from '../utils/formato'
 import { camposConfigPendientes } from '../utils/configuracion'
 import ErrorDatos from '../components/ErrorDatos'
 import {
@@ -486,8 +486,8 @@ function NuevaFactura() {
               />
               {/* Importe de la línea, en vivo */}
               <span className="w-20 text-right text-sm text-gray-600">
-                {((Number(conceptos?.[index]?.cantidad) || 0) *
-                  numeroDesdeTexto(conceptos?.[index]?.precioUnitario)).toFixed(2)} €
+                {formatearEuros((Number(conceptos?.[index]?.cantidad) || 0) *
+                  numeroDesdeTexto(conceptos?.[index]?.precioUnitario))}
               </span>
               <button type="button" onClick={() => remove(index)}
                 className="text-red-600 w-8">
@@ -557,10 +557,10 @@ function NuevaFactura() {
               />
               {/* Importe de esta línea, en vivo */}
               <span className="w-20 text-right text-sm text-gray-600">
-                {calcularManoDeObra(
+                {formatearEuros(calcularManoDeObra(
                   numeroDesdeTexto(lineasManoDeObra?.[index]?.horas),
                   numeroDesdeTexto(lineasManoDeObra?.[index]?.precioHora),
-                ).toFixed(2)} €
+                ))}
               </span>
               <button type="button" onClick={() => removeManoDeObra(index)}
                 className="text-red-600 w-8">
@@ -629,12 +629,11 @@ function NuevaFactura() {
               {errors.root.importe.message}
             </span>
           )}
-          <span>Total materiales: {totalMateriales.toFixed(2)} €</span>
-          <span>Total mano de obra: {manoDeObra.toFixed(2)} €</span>
-          <span>Base imponible: {baseImponible.toFixed(2)} €</span>
-          <span>IVA ({iva}%): {(total - baseImponible).toFixed(2)} €</span>
-          <span className="font-bold text-lg">TOTAL: {total.toFixed(2)}
-            €</span>
+          <span>Total materiales: {formatearEuros(totalMateriales)}</span>
+          <span>Total mano de obra: {formatearEuros(manoDeObra)}</span>
+          <span>Base imponible: {formatearEuros(baseImponible)}</span>
+          <span>IVA ({iva}%): {formatearEuros(total - baseImponible)}</span>
+          <span className="font-bold text-lg">TOTAL: {formatearEuros(total)}</span>
         </div>
 
         <button

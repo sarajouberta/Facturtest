@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { formatearHoras, formatearDecimal, numeroDesdeTexto } from './formato'
+import { formatearHoras, formatearDecimal, formatearEuros, numeroDesdeTexto } from './formato'
 
 describe('formatearDecimal', () => {
     test('dos decimales y coma', () => {
@@ -76,5 +76,27 @@ describe('numeroDesdeTexto', () => {
 
     test('un número ya numérico pasa tal cual', () => {
         expect(numeroDesdeTexto(0.8)).toBe(0.8)
+    })
+})
+
+describe('formatearEuros', () => {
+    test('importe con coma y símbolo', () => {
+        expect(formatearEuros(46.5)).toBe('46,50 €')
+        expect(formatearEuros(211.75)).toBe('211,75 €')
+    })
+
+    test('siempre dos decimales', () => {
+        expect(formatearEuros(20)).toBe('20,00 €')
+        expect(formatearEuros(0)).toBe('0,00 €')
+    })
+
+    // toFixed(2) daría '46.50': punto decimal, que en español es incorrecto
+    test('nunca usa el punto decimal', () => {
+        expect(formatearEuros(46.5)).not.toContain('.')
+    })
+
+    test('un importe que falta cuenta como cero', () => {
+        expect(formatearEuros(undefined)).toBe('0,00 €')
+        expect(formatearEuros(NaN)).toBe('0,00 €')
     })
 })

@@ -4,7 +4,7 @@ import { useFactura, useConfig, borrarFactura } from '../datos'
 import FacturaPDF from '../components/FacturaPDF'
 import ErrorDatos from '../components/ErrorDatos'
 import { calcularManoDeObra } from '../utils/calculos'
-import { formatearHoras } from '../utils/formato'
+import { formatearHoras, formatearEuros } from '../utils/formato'
 import { useRef, useState } from 'react'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas-pro'
@@ -167,7 +167,7 @@ function DetalleFactura() {
       nota: factura.totalMateriales ?? 0: el ?? (operador de fusión de nulos) significa
       "usa totalMateriales, pero si es null o undefined, usa 0". Se pone porque las
       facturas creadas antes de ampliar el modelo no tienen estos campos, y sin
-      esta defensa .toFixed(2) daría error (buena costumbre al evolucionar un
+      esta defensa los cálculos darían NaN (buena costumbre al evolucionar un
       modelo de datos) */
     const totalMateriales = factura.totalMateriales ?? 0
     const manoDeObra = factura.manoDeObra ?? 0
@@ -238,9 +238,9 @@ function DetalleFactura() {
                             <tr key={i} className="border-b">
                                 <td className="py-1">{c.descripcion}</td>
                                 <td className="py-1 text-right">{c.cantidad}</td>
-                                <td className="py-1 text-right">{Number(c.precioUnitario).toFixed(2)} €</td>
+                                <td className="py-1 text-right">{formatearEuros(c.precioUnitario)}</td>
                                 <td className="py-1 text-right">
-                                    {(Number(c.cantidad) * Number(c.precioUnitario)).toFixed(2)} €
+                                    {formatearEuros(Number(c.cantidad) * Number(c.precioUnitario))}
                                 </td>
                             </tr>
                         ))}
@@ -268,10 +268,10 @@ function DetalleFactura() {
                                     {formatearHoras(l.horas)}
                                 </td>
                                 <td className="py-1 text-right">
-                                    {(Number(l.precioHora) || 0).toFixed(2)} €
+                                    {formatearEuros(l.precioHora)}
                                 </td>
                                 <td className="py-1 text-right">
-                                    {calcularManoDeObra(l.horas, l.precioHora).toFixed(2)} €
+                                    {formatearEuros(calcularManoDeObra(l.horas, l.precioHora))}
                                 </td>
                             </tr>
                         ))}
@@ -281,12 +281,11 @@ function DetalleFactura() {
 
             {/* Totales */}
             <div className="flex flex-col items-end gap-1 mb-6">
-                <span>Total materiales: {totalMateriales.toFixed(2)} €</span>
-                <span>Total mano de obra: {manoDeObra.toFixed(2)} €</span>
-                <span>Base imponible: {baseImponible.toFixed(2)} €</span>
-                <span>IVA ({factura.iva}%): {(total - baseImponible).toFixed(2)}
-                    €</span>
-                <span className="font-bold text-lg">TOTAL: {total.toFixed(2)} €</span>
+                <span>Total materiales: {formatearEuros(totalMateriales)}</span>
+                <span>Total mano de obra: {formatearEuros(manoDeObra)}</span>
+                <span>Base imponible: {formatearEuros(baseImponible)}</span>
+                <span>IVA ({factura.iva}%): {formatearEuros(total - baseImponible)}</span>
+                <span className="font-bold text-lg">TOTAL: {formatearEuros(total)}</span>
             </div>
 
             <div className="flex gap-2">

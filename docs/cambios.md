@@ -5,6 +5,31 @@ Lo más reciente arriba.
 
 ---
 
+## 2026-08-20 — Los importes se muestran en formato español
+
+Detectado al editar una factura: el campo decía `46,50` y el total de la misma pantalla decía
+`46.50`. La incoherencia venía de antes, pero hasta ahora no se veían ambos a la vez.
+
+**Causa:** los importes calculados se pintaban con `.toFixed(2)`, y ese método devuelve
+**siempre punto decimal**, sin mirar el idioma. Es notación fija de JavaScript, no formato local.
+La coma solo aparecía en los campos de texto, porque ahí la ponía `formatearDecimal`.
+
+Afectaba a **25 sitios**: la lista, el formulario, el detalle y —lo más importante— **el PDF**,
+que es el documento que recibe el cliente. Una factura española que dice `211.75 €` está mal.
+
+**Arreglo:** nueva `formatearEuros` en `utils/formato.js`, que devuelve el importe ya formateado
+**con su símbolo** (`46.5` pasa a ser `'46,50 €'`), y sustituye a todos los `toFixed(2)`.
+
+- El `€` sale ahora de la función y no suelto en el JSX, donde a veces quedaba incluso en otra
+  línea. Así no puede haber un sitio con símbolo y otro sin él.
+- Desaparecen los `Number(...) || 0` que acompañaban a cada `toFixed`: la función ya hace esa
+  defensa por dentro.
+- Uno de los tests comprueba explícitamente que **el resultado nunca contiene un punto**.
+
+Tests: de 114 a **118**.
+
+---
+
 ## 2026-08-20 — Editar factura
 
 Hasta ahora una factura, una vez creada, no se podía tocar: una errata en la matrícula obligaba a

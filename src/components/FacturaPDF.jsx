@@ -1,7 +1,7 @@
 /*Nota: usa estilos en línea (style={{...}}) con colores hex, no Tailwind, para
   que la captura salga fiel y sin sustos*/
 import { calcularManoDeObra } from '../utils/calculos'
-import { formatearHoras } from '../utils/formato'
+import { formatearHoras, formatearEuros } from '../utils/formato'
 /* ?inline hace que Vite meta la imagen en el código como base64 en vez de dejarla
    como archivo aparte. Así, al capturar la hoja para el PDF, la imagen ya está
    dentro del documento: no hay petición de red que pueda llegar tarde ni ruta que
@@ -152,7 +152,7 @@ function FacturaPDF({ factura, config }) {
                             <td style={{ ...td, textAlign: 'right' }}>{m.cantidad}</td>
                             <td style={td}>{m.descripcion}</td>
                             <td style={{ ...td, textAlign: 'right' }}>
-                                {(Number(m.cantidad) * Number(m.precioUnitario)).toFixed(2)} €
+                                {formatearEuros(Number(m.cantidad) * Number(m.precioUnitario))}
                             </td>
                         </tr>
                     ))}
@@ -180,14 +180,14 @@ function FacturaPDF({ factura, config }) {
                                     {l.descripcion}
                                     {' '}
                                     <span style={{ color: '#6b7280' }}>
-                                        ({(Number(l.precioHora) || 0).toFixed(2)} €)
+                                        ({formatearEuros(l.precioHora)})
                                     </span>
                                 </td>
                                 <td style={{ ...td, textAlign: 'right' }}>
                                     {formatearHoras(l.horas)}
                                 </td>
                                 <td style={{ ...td, textAlign: 'right' }}>
-                                    {calcularManoDeObra(l.horas, l.precioHora).toFixed(2)} €
+                                    {formatearEuros(calcularManoDeObra(l.horas, l.precioHora))}
                                 </td>
                             </tr>
                         ))}
@@ -206,29 +206,27 @@ function FacturaPDF({ factura, config }) {
                             <td style={td}>Total materiales</td>
                             <td style={{
                                 ...td, textAlign: 'right'
-                            }}>{totalMateriales.toFixed(2)} €</td>
+                            }}>{formatearEuros(totalMateriales)}</td>
                         </tr>
                         <tr>
                             <td style={td}>Total mano de obra</td>
-                            <td style={{ ...td, textAlign: 'right' }}>{manoDeObra.toFixed(2)}
-                                €</td>
+                            <td style={{ ...td, textAlign: 'right' }}>{formatearEuros(manoDeObra)}</td>
                         </tr>
                         <tr>
                             <td style={td}>Base imponible</td>
                             <td style={{
                                 ...td, textAlign: 'right'
-                            }}>{baseImponible.toFixed(2)} €</td>
+                            }}>{formatearEuros(baseImponible)}</td>
                         </tr>
                         <tr>
                             <td style={td}>IVA ({factura.iva}%)</td>
-                            <td style={{ ...td, textAlign: 'right' }}>{ivaImporte.toFixed(2)}
-                                €</td>
+                            <td style={{ ...td, textAlign: 'right' }}>{formatearEuros(ivaImporte)}</td>
                         </tr>
                         <tr>
                             <td style={{ ...td, fontWeight: 'bold' }}>TOTAL</td>
                             <td style={{
                                 ...td, textAlign: 'right', fontWeight: 'bold'
-                            }}>{total.toFixed(2)} €</td>
+                            }}>{formatearEuros(total)}</td>
                         </tr>
                     </tbody>
                 </table>
