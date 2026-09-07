@@ -2,3 +2,104 @@
 Para "encender" tailwind e importar todas sus utilidades
 */
 @import "tailwindcss";
+
+/* Oswald, empaquetada con la app. Se sirve desde el propio build y la cachea
+   el service worker, así que funciona sin conexión; enlazada desde Google Fonts
+   se quedaría sin cargar en el taller sin cobertura. Licencia y procedencia en
+   src/assets/fuentes/LEEME.txt
+
+   font-display: swap pinta el texto con la fuente del sistema mientras llega la
+   definitiva, en vez de dejarlo invisible un instante. */
+@font-face {
+  font-family: 'Oswald';
+  src: url('./assets/fuentes/oswald-latin.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Paleta de ASTURTEST. Los tonos están tomados del icono de la app, que se
+   generó a partir de la tarjeta del taller, para que la app y el icono no se
+   contradigan. Definirlos aquí hace que Tailwind genere sus utilidades
+   (text-marca, border-marca, bg-marca-claro...) y que el rojo salga de un solo
+   sitio. */
+@theme {
+  --color-marca: #d31e1e;
+  --color-marca-oscuro: #a81818;
+  --color-marca-claro: #fdecec;
+  --color-amarillo: #f7d000;
+  --color-amarillo-oscuro: #dbb900;
+  --color-tinta: #141414;
+  --color-gris: #8c8c8c;
+  --color-gris-oscuro: #6f6f6f;
+  --font-rotulo: 'Oswald', system-ui, sans-serif;
+}
+/* Respuesta al pulsar: el botón encoge un poco mientras se mantiene apretado.
+   Va aquí y no en cada botón para que valga para todos, incluidos los que se
+   añadan más adelante.
+
+   :active dura lo que dura la pulsación, y en el móvil es lo único que hay
+   (no existe el paso del ratón por encima), que es justo donde se usa la app.
+
+   :not(:disabled) evita que responda un botón deshabilitado, como "Generando
+   PDF...", que no debe parecer que acepta pulsaciones.
+
+   prefers-reduced-motion: quien haya pedido en su sistema menos animaciones no
+   ve el efecto. */
+@layer base {
+  button {
+    transition: transform 100ms ease;
+  }
+
+  button:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    button {
+      transition: none;
+    }
+    button:active:not(:disabled) {
+      transform: none;
+    }
+  }
+}
+
+/* Al entrar en un campo: el borde se tiñe y aparece un resplandor alrededor,
+   los dos con una transición suave en vez de aparecer de golpe.
+
+   Se usa box-shadow y no un borde más grueso a propósito: la sombra se dibuja
+   FUERA del elemento y no ocupa espacio, así que no mueve nada. Engordar el
+   borde sí desplazaría a los campos vecinos, y en las filas de materiales y
+   mano de obra, que van pegadas y con anchos fijos, se notaría un salto cada
+   vez que se cambia de casilla.
+
+   Se quita el outline del navegador porque lo sustituye este resplandor, que se
+   ve igual de claro; dejar un campo sin ninguna señal de foco sí sería un
+   problema para quien navega con el tabulador.
+
+   :focus y no :focus-visible porque interesa que se vea también al pulsar con
+   el ratón o con el dedo, no solo al llegar tabulando. */
+@layer base {
+  input,
+  textarea,
+  select {
+    transition: box-shadow 150ms ease, border-color 150ms ease;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.25);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    input,
+    textarea,
+    select {
+      transition: none;
+    }
+  }
+}

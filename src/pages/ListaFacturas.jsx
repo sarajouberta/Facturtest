@@ -41,12 +41,12 @@ function ListaFacturas() {
   const facturasFiltradas = filtrarFacturas(facturas, { texto, anio, mes })
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">Facturas</h2>
         <Link
           to="/nueva-factura"
-          className="bg-blue-600 text-white rounded px-4 py-2 font-medium"
+          className="bg-marca hover:bg-marca-oscuro text-white rounded px-4 py-2 font-medium"
         >
           + Nueva
         </Link>

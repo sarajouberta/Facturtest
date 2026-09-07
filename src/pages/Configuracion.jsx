@@ -97,7 +97,7 @@ function Configuracion() {
   }
 
   return (
-    <div className="max-w-md">
+    <div className="max-w-md mx-auto">
       <h2 className="text-xl font-bold mb-1">Configuración del taller</h2>
       <p className="text-sm text-gray-500 mb-4">Los campos con * son obligatorios.</p>
 
@@ -232,7 +232,7 @@ function Configuracion() {
 
         <button
           type="submit"
-          className="bg-blue-600 text-white rounded px-4 py-2 font-medium mt-2"
+          className="bg-marca hover:bg-marca-oscuro text-white rounded px-4 py-2 font-medium mt-2"
         >
           Guardar
         </button>

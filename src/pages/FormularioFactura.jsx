@@ -263,7 +263,7 @@ function FormularioFactura() {
   if (modoEdicion && factura === undefined) return <p>Cargando…</p>
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-2xl mx-auto">
       <h2 className="text-xl font-bold mb-1">{modoEdicion ? 'Editar factura' : 'Nueva factura'}</h2>
       <p className="text-sm text-gray-500 mb-4">Los campos con * son obligatorios.</p>
 
@@ -443,7 +443,7 @@ function FormularioFactura() {
           {/* Cabecera de columnas. Hace falta porque los placeholders desaparecen
               en cuanto se escribe: sin esto quedan casillas sueltas sin nombre.
               Los anchos deben coincidir con los de los inputs de abajo. */}
-          <div className="flex gap-2 items-center text-xs font-medium text-gray-500">
+          <div className="hidden sm:flex gap-2 items-center text-xs font-medium text-gray-500">
             <span className="flex-1">Descripción materiales</span>
             <span className="w-20 text-right">Cant.</span>
             <span className="w-24 text-right">Precio</span>
@@ -451,48 +451,63 @@ function FormularioFactura() {
             <span className="w-8" aria-hidden="true"></span>
           </div>
           {fields.map((field, index) => (
-            <div key={field.id} className="flex gap-2 items-center">
+            <div key={field.id} className="flex flex-col sm:flex-row gap-2 sm:items-center">
               <input
-                className="border rounded px-3 py-2 flex-1"
+                className="border rounded px-3 py-2 flex-1 min-w-0"
                 placeholder="Descripción materiales"
                 {...register(`conceptos.${index}.descripcion`)}
               />
-              <input
-                type="number"
-                min="1"
-                className="border rounded px-3 py-2 w-20"
-                placeholder="Cant."
-                {...register(`conceptos.${index}.cantidad`, {
-                  valueAsNumber: true,
-                  min: { value: 1, message: 'La cantidad mínima es 1' },
-                })}
-                onFocus={(e) => e.target.select()}
-              />
-              {/* Igual que las horas: campo de texto con nuestra propia regla.
-                  Con type="number", un precio escrito con coma puede quedarse
-                  vacío según el navegador y guardarse como 0 sin avisar. */}
-              <input
-                type="text"
-                inputMode="decimal"
-                className="border rounded px-3 py-2 w-24"
-                placeholder="Precio"
-                {...register(`conceptos.${index}.precioUnitario`, {
-                  pattern: {
-                    value: /^\d*([.,]\d{1,2})?$/,
-                    message: 'El precio va en euros, p. ej. 46,50 (máximo 2 decimales)',
-                  },
-                })}
-                onFocus={(e) => e.target.select()}
-              />
-              {/* Importe de la línea, en vivo */}
-              <span className="w-20 text-right text-sm text-gray-600">
-                {formatearEuros((Number(conceptos?.[index]?.cantidad) || 0) *
-                  numeroDesdeTexto(conceptos?.[index]?.precioUnitario))}
-              </span>
-              <button type="button" onClick={() => remove(index)}
-                className="text-red-600 w-8">
-                ✕
-              </button>
+              {/* Los números van juntos en su propia fila cuando la pantalla es
+                  estrecha: en un móvil las cinco columnas no caben. Ahí la
+                  cabecera se oculta, así que cada campo lleva su etiqueta (que
+                  desaparece en pantalla grande, donde manda la cabecera). */}
+              <div className="flex gap-2 items-end">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-500 sm:hidden">Cant.</span>
+                  <input
+                    type="number"
+                    min="1"
+                    className="border rounded px-3 py-2 w-20"
+                    placeholder="Cant."
+                    {...register(`conceptos.${index}.cantidad`, {
+                      valueAsNumber: true,
+                      min: { value: 1, message: 'La cantidad mínima es 1' },
+                    })}
+                    onFocus={(e) => e.target.select()}
+                  />
+                </label>
+                {/* Igual que las horas: campo de texto con nuestra propia regla.
+                    Con type="number", un precio escrito con coma puede quedarse
+                    vacío según el navegador y guardarse como 0 sin avisar. */}
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-500 sm:hidden">Precio</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    className="border rounded px-3 py-2 w-24"
+                    placeholder="Precio"
+                    {...register(`conceptos.${index}.precioUnitario`, {
+                      pattern: {
+                        value: /^\d*([.,]\d{1,2})?$/,
+                        message: 'El precio va en euros, p. ej. 46,50 (máximo 2 decimales)',
+                      },
+                    })}
+                    onFocus={(e) => e.target.select()}
+                  />
+                </label>
+                {/* Importe de la línea, en vivo */}
+                <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+                  <span className="text-xs text-gray-500 sm:hidden">Importe</span>
+                  <span className="w-20 text-right text-sm text-gray-600 py-2">
+                    {formatearEuros((Number(conceptos?.[index]?.cantidad) || 0) *
+                      numeroDesdeTexto(conceptos?.[index]?.precioUnitario))}
+                  </span>
+                </div>
+                <button type="button" onClick={() => remove(index)}
+                  className="text-red-600 w-8 py-2">
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
           {errors.conceptos && (
@@ -506,7 +521,7 @@ function FormularioFactura() {
               descripcion: '', cantidad: 1,
               precioUnitario: ''
             })}
-            className="text-blue-600 self-start"
+            className="text-marca hover:underline font-medium self-start"
           >
             + Añadir material
           </button>
@@ -516,7 +531,7 @@ function FormularioFactura() {
         <fieldset className="flex flex-col gap-3 border rounded p-4">
           <legend className="font-semibold px-1">Mano de obra</legend>
           {/* Mismos anchos que los inputs de abajo, para que las columnas cuadren */}
-          <div className="flex gap-2 items-center text-xs font-medium text-gray-500">
+          <div className="hidden sm:flex gap-2 items-center text-xs font-medium text-gray-500">
             <span className="flex-1">Tarea</span>
             <span className="w-24 text-right">Cantidad</span>
             <span className="w-24 text-right">€/hora</span>
@@ -525,8 +540,8 @@ function FormularioFactura() {
           </div>
           {fieldsManoDeObra.map((field, index) => (
             <div key={field.id} className="flex flex-col gap-1">
-              <div className="flex gap-2 items-center">
-              <input className="border rounded px-3 py-2 flex-1" placeholder="Tarea"
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <input className="border rounded px-3 py-2 flex-1 min-w-0" placeholder="Tarea"
                 {...register(`lineasManoDeObra.${index}.descripcion`)}
               />
               {/* Campo de texto, no type="number": así no aparece el spinner (las
@@ -535,37 +550,48 @@ function FormularioFactura() {
                   móvil el teclado numérico con la coma.
                   Horas en decimal, con coma o punto y hasta 2 decimales.
                   Vacío se admite y cuenta como 0. */}
-              <input type="text" inputMode="decimal"
-                className="border rounded px-3 py-2 w-24" placeholder="0,80"
-                {...register(`lineasManoDeObra.${index}.horas`, {
-                  pattern: {
-                    value: /^\d*([.,]\d{1,2})?$/,
-                    message: 'Las horas van en decimal, p. ej. 0,80 (máximo 2 decimales)',
-                  },
-                })}
-                onFocus={(e) => e.target.select()}
-              />
-              <input type="text" inputMode="decimal"
-                className="border rounded px-3 py-2 w-24" placeholder="€/hora"
-                {...register(`lineasManoDeObra.${index}.precioHora`, {
-                  pattern: {
-                    value: /^\d*([.,]\d{1,2})?$/,
-                    message: 'La tarifa va en euros por hora, p. ej. 46,50 (máximo 2 decimales)',
-                  },
-                })}
-                onFocus={(e) => e.target.select()}
-              />
-              {/* Importe de esta línea, en vivo */}
-              <span className="w-20 text-right text-sm text-gray-600">
-                {formatearEuros(calcularManoDeObra(
-                  numeroDesdeTexto(lineasManoDeObra?.[index]?.horas),
-                  numeroDesdeTexto(lineasManoDeObra?.[index]?.precioHora),
-                ))}
-              </span>
-              <button type="button" onClick={() => removeManoDeObra(index)}
-                className="text-red-600 w-8">
-                ✕
-              </button>
+              <div className="flex gap-2 items-end">
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-500 sm:hidden">Cantidad</span>
+                  <input type="text" inputMode="decimal"
+                    className="border rounded px-3 py-2 w-24" placeholder="0,80"
+                    {...register(`lineasManoDeObra.${index}.horas`, {
+                      pattern: {
+                        value: /^\d*([.,]\d{1,2})?$/,
+                        message: 'Las horas van en decimal, p. ej. 0,80 (máximo 2 decimales)',
+                      },
+                    })}
+                    onFocus={(e) => e.target.select()}
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-xs text-gray-500 sm:hidden">€/hora</span>
+                  <input type="text" inputMode="decimal"
+                    className="border rounded px-3 py-2 w-24" placeholder="€/hora"
+                    {...register(`lineasManoDeObra.${index}.precioHora`, {
+                      pattern: {
+                        value: /^\d*([.,]\d{1,2})?$/,
+                        message: 'La tarifa va en euros por hora, p. ej. 46,50 (máximo 2 decimales)',
+                      },
+                    })}
+                    onFocus={(e) => e.target.select()}
+                  />
+                </label>
+                {/* Importe de esta línea, en vivo */}
+                <div className="flex flex-col gap-1 flex-1 sm:flex-none">
+                  <span className="text-xs text-gray-500 sm:hidden">Importe</span>
+                  <span className="w-20 text-right text-sm text-gray-600 py-2">
+                    {formatearEuros(calcularManoDeObra(
+                      numeroDesdeTexto(lineasManoDeObra?.[index]?.horas),
+                      numeroDesdeTexto(lineasManoDeObra?.[index]?.precioHora),
+                    ))}
+                  </span>
+                </div>
+                <button type="button" onClick={() => removeManoDeObra(index)}
+                  className="text-red-600 w-8 py-2">
+                  ✕
+                </button>
+              </div>
               </div>
               {/* El error, debajo de SU línea y con el mensaje concreto: con varias
                   tareas, un aviso genérico al final no dice cuál falla. */}
@@ -588,7 +614,7 @@ function FormularioFactura() {
                 ? config.precioManoDeObra
                 : 0,
             })}
-            className="text-blue-600 self-start" >
+            className="text-marca hover:underline font-medium self-start" >
             + Añadir mano de obra
           </button>
           {/* La pista va debajo, junto a los campos, y no arriba del todo */}
@@ -638,8 +664,7 @@ function FormularioFactura() {
 
         <button
           type="submit"
-          className="bg-blue-600 text-white rounded px-4 py-2 font-medium 
-  self-start"
+          className="bg-marca hover:bg-marca-oscuro text-white rounded px-4 py-2 font-medium self-start"
         >
           {modoEdicion ? 'Guardar cambios' : 'Guardar factura'}
         </button>

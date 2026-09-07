@@ -175,7 +175,7 @@ function DetalleFactura() {
     const total = factura.total ?? 0
 
     return (
-        <div className="max-w-2xl">
+        <div className="max-w-2xl mx-auto">
             <h2 className="text-xl font-bold mb-1">Factura {factura.numero}</h2>
             <p className="text-sm text-gray-600 mb-4">{factura.fecha}</p>
 
@@ -293,11 +293,11 @@ function DetalleFactura() {
                     Volver
                 </button>
                 <button onClick={() => navigate(`/factura/${factura.id}/editar`)}
-                    className="bg-blue-600 text-white rounded px-4 py-2">
+                    className="bg-amarillo hover:bg-amarillo-oscuro text-tinta font-medium rounded px-4 py-2">
                     Editar
                 </button>
                 <button onClick={exportarPDF} disabled={exportando}
-                    className="bg-green-600 text-white rounded px-4 py-2 disabled:opacity-60">
+                    className="bg-gris-oscuro hover:bg-tinta text-white rounded px-4 py-2 disabled:opacity-60">
                     {exportando ? 'Generando PDF…' : 'Exportar PDF'}
                 </button>
                 <button onClick={eliminar} className="bg-red-600 text-white rounded px-4 py-2">
