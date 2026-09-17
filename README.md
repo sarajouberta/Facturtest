@@ -44,8 +44,8 @@ cp .env.example .env.local     # y rellenar con las claves del proyecto de Fireb
 npm run dev                    # http://localhost:5173
 ```
 
-Las seis variables `VITE_FIREBASE_*` se sacan de la consola de Firebase → Configuración del
-proyecto → Tus apps. Sin ellas la app no arranca.
+Las seis variables `VITE_FIREBASE_*` se sacan de la consola de Firebase -> Configuración del
+proyecto -> Tus apps. Sin ellas la app no arranca.
 
 > Las variables `VITE_*` se **incrustan durante el build**, no se leen en tiempo de ejecución:
 > al cambiarlas en producción hay que **redesplegar** para que surtan efecto.
@@ -96,5 +96,4 @@ El proyecto lleva documentación propia, escrita mientras se construía:
 
 ## Estado
 
-MVP completo y en uso. En la cola: editar facturas, exportar/importar copia de seguridad,
-ordenar la lista, tests de componentes y una pasada de diseño.
+MVP completo y en uso. Pendiente de posibles mejoras y mantenimiento, si es necesario.
